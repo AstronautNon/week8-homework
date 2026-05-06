@@ -74,14 +74,14 @@ if len(distance_anomalies) > 0:
         print(f"    最大值: {trips.loc[distance_mask, 'trip_distance'].max()}")
 
 # 3.4 车费金额异常：>=300 或 <=0
-fare_mask = (trips['fare_amount'] >= 300) | (trips['fare_amount'] <= 0)
-fare_anomalies = trips[fare_mask]
-print(f"\n(4) 车费金额异常 (>=300 或 <=0): {len(fare_anomalies)} 条")
-if len(fare_anomalies) > 0:
-    print(f"    占比: {(len(fare_anomalies)/len(trips)*100):.2f}%")
+total_mask = (trips['total_amount'] >= 300) | (trips['total_amount'] <= 0)
+total_anomalies = trips[total_mask]
+print(f"\n(4) 车费金额异常 (>=300 或 <=0): {len(total_anomalies)} 条")
+if len(total_anomalies) > 0:
+    print(f"    占比: {(len(total_anomalies)/len(trips)*100):.2f}%")
     if 'fare_amount' in trips.columns:
-        print(f"    最小值: {trips.loc[fare_mask, 'fare_amount'].min()}")
-        print(f"    最大值: {trips.loc[fare_mask, 'fare_amount'].max()}")
+        print(f"    最小值: {trips.loc[total_mask, 'fare_amount'].min()}")
+        print(f"    最大值: {trips.loc[total_mask, 'fare_amount'].max()}")
 
 # 4. 异常值汇总
 print("\n" + "=" * 60)
@@ -89,7 +89,7 @@ print("【异常值汇总】")
 print("=" * 60)
 
 # 创建综合异常标记
-combined_anomaly_mask = time_mask | passenger_mask | distance_mask | fare_mask
+combined_anomaly_mask = time_mask | passenger_mask | distance_mask | total_mask
 total_anomalies = trips[combined_anomaly_mask]
 
 print(f"\n存在至少一种异常的记录总数: {len(total_anomalies)}")
