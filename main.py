@@ -114,6 +114,7 @@ print("报告生成完毕")
 print("=" * 60)
 
 
+
 # ==================== 数据清洗 ====================
 print("\n\n" + "=" * 60)
 print("数据清洗开始")
@@ -187,3 +188,72 @@ print(f"总共删除记录数: {len(pq.read_table('data/yellow_tripdata_2023-01.
 output_path = 'output/cleaned_yellow_tripdata_2023-01.parquet'
 trips.to_parquet(output_path, index=False)
 print(f"\n清洗后的数据已保存到: {output_path}")
+
+
+
+# ==================== 特征工程 ====================
+print("\n\n" + "=" * 60)
+print("特征工程开始")
+print("=" * 60)
+
+# 1. 从tpep_pickup_datetime提取小时和星期
+print("\n(1) 提取上车时间的小时和星期...")
+trips['pickup_hour'] = trips['tpep_pickup_datetime'].dt.hour
+trips['pickup_day'] = trips['tpep_pickup_datetime'].dt.dayofweek + 1
+print(f"    pickup_hour范围: {trips['pickup_hour'].min()} - {trips['pickup_hour'].max()}")
+print(f"    pickup_day范围: {trips['pickup_day'].min()} (周一) - {trips['pickup_day'].max()} (周日)")
+
+# 2. 从tpep_dropoff_datetime提取小时
+print("\n(2) 提取下车时间的小时...")
+trips['dropoff_hour'] = trips['tpep_dropoff_datetime'].dt.hour
+print(f"    dropoff_hour范围: {trips['dropoff_hour'].min()} - {trips['dropoff_hour'].max()}")
+
+# 3. 创建is_peak列（高峰期：周一至周五的7-9点和17-19点）
+print("\n(3) 创建is_peak列（高峰期标记）...")
+# pickup_day: 1=周一, 2=周二, 3=周三, 4=周四, 5=周五, 6=周六, 7=周日
+# 高峰期条件：工作日(1-5) 且 (7-9点 或 17-19点)
+trips['is_peak'] = (
+    (trips['pickup_day'] <= 5) &
+    ((trips['pickup_hour'] >= 7) & (trips['pickup_hour'] <= 9) |
+     (trips['pickup_hour'] >= 17) & (trips['pickup_hour'] <= 19))
+).astype(int)
+
+peak_count = trips['is_peak'].sum()
+print(f"    高峰期行程数量: {peak_count}")
+print(f"    非高峰期行程数量: {len(trips) - peak_count}")
+print(f"    高峰期占比: {(peak_count/len(trips)*100):.2f}%")
+
+# 4. 创建pre_distance_profit列（单位距离收益）
+print("\n(4) 创建pre_distance_profit列（单位距离收益）...")
+trips['pre_distance_profit'] = trips['total_amount'] / trips['trip_distance']
+print(f"    pre_distance_profit统计信息:")
+print(f"    平均值: {trips['pre_distance_profit'].mean():.2f}")
+print(f"    最小值: {trips['pre_distance_profit'].min():.2f}")
+print(f"    最大值: {trips['pre_distance_profit'].max():.2f}")
+print(f"    中位数: {trips['pre_distance_profit'].median():.2f}")
+
+# 特征工程完成总结
+print("\n" + "=" * 60)
+print("特征工程完成")
+print("=" * 60)
+print(f"新增列: pickup_hour, pickup_day, dropoff_hour, is_peak, pre_distance_profit")
+print(f"当前总列数: {len(trips.columns)}")
+print(f"当前记录数: {len(trips)}")
+
+# 保存特征工程后的数据
+output_path_feature = 'output/featured_yellow_tripdata_2023-01.parquet'
+trips.to_parquet(output_path_feature, index=False)
+print(f"\n特征工程后的数据已保存到: {output_path_feature}")
+
+# 显示最终数据结构
+print("\n" + "=" * 60)
+print("最终数据结构预览")
+print("=" * 60)
+print("\n前5行数据：")
+display_cols = ['pickup_hour', 'pickup_day', 'dropoff_hour', 'is_peak',
+                'trip_distance', 'total_amount', 'pre_distance_profit']
+print(trips[display_cols].head())
+
+print("\n" + "=" * 60)
+print("全部处理完成")
+print("=" * 60)
