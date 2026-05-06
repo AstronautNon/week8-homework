@@ -114,3 +114,71 @@ print("报告生成完毕")
 print("=" * 60)
 
 
+# ==================== 数据清洗 ====================
+print("\n\n" + "=" * 60)
+print("数据清洗开始")
+print("=" * 60)
+print(f"原始数据记录数: {len(trips)}")
+
+# 1. 删除所有包含NaN的行
+print("\n(1) 删除包含NaN的行...")
+initial_count = len(trips)
+trips = trips.dropna()
+print(f"    删除了 {initial_count - len(trips)} 条记录")
+print(f"    剩余记录数: {len(trips)}")
+
+# 2. 删除passenger_count异常的记录 (<=0 或 >6)
+print("\n(2) 删除passenger_count异常的记录 (<=0 或 >6)...")
+initial_count = len(trips)
+mask_passenger = (trips['passenger_count'] <= 0) | (trips['passenger_count'] > 6)
+trips = trips[~mask_passenger].copy()
+print(f"    删除了 {initial_count - len(trips)} 条记录")
+print(f"    剩余记录数: {len(trips)}")
+
+# 3. 删除tpep_pickup_datetime >= tpep_dropoff_datetime的记录
+print("\n(3) 删除上车时间 >= 下车时间的记录...")
+initial_count = len(trips)
+mask_time = trips['tpep_pickup_datetime'] >= trips['tpep_dropoff_datetime']
+trips = trips[~mask_time].copy()
+print(f"    删除了 {initial_count - len(trips)} 条记录")
+print(f"    剩余记录数: {len(trips)}")
+
+# 4. 处理trip_distance
+print("\n(4) 处理trip_distance...")
+# 4.1 删除trip_distance <= 0的记录
+initial_count = len(trips)
+mask_distance_zero = trips['trip_distance'] <= 0
+trips = trips[~mask_distance_zero].copy()
+print(f"    删除trip_distance <= 0的记录: {initial_count - len(trips)} 条")
+
+# 4.2 删除trip_distance > 350的记录
+initial_count = len(trips)
+mask_distance_extreme = trips['trip_distance'] > 350
+trips = trips[~mask_distance_extreme].copy()
+print(f"    删除trip_distance > 350的记录: {initial_count - len(trips)} 条")
+
+# 4.3 为100 < trip_distance <= 350添加long_trip标签
+trips['long_trip'] = trips['trip_distance'].apply(lambda x: 1 if (x > 100 and x <= 350) else 0)
+long_trip_count = trips['long_trip'].sum()
+print(f"    添加long_trip标签: {long_trip_count} 条记录标记为长途行程")
+print(f"    剩余记录数: {len(trips)}")
+
+# 5. 处理total_amount：删除<=0和>=1000的记录
+print("\n(5) 处理total_amount...")
+initial_count = len(trips)
+mask_total_invalid = (trips['total_amount'] <= 0) | (trips['total_amount'] >= 1000)
+trips = trips[~mask_total_invalid].copy()
+print(f"    删除了 {initial_count - len(trips)} 条记录 (total_amount <= 0 或 >= 1000)")
+print(f"    剩余记录数: {len(trips)}")
+
+# 清洗完成总结
+print("\n" + "=" * 60)
+print("数据清洗完成")
+print("=" * 60)
+print(f"清洗后记录数: {len(trips)}")
+print(f"总共删除记录数: {len(pq.read_table('data/yellow_tripdata_2023-01.parquet').to_pandas()) - len(trips)}")
+
+# 保存清洗后的数据
+output_path = 'output/cleaned_yellow_tripdata_2023-01.parquet'
+trips.to_parquet(output_path, index=False)
+print(f"\n清洗后的数据已保存到: {output_path}")
