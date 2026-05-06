@@ -73,10 +73,10 @@ if len(distance_anomalies) > 0:
         print(f"    最小值: {trips.loc[distance_mask, 'trip_distance'].min()}")
         print(f"    最大值: {trips.loc[distance_mask, 'trip_distance'].max()}")
 
-# 3.4 车费金额异常：>=300 或 <=0
-total_mask = (trips['total_amount'] >= 300) | (trips['total_amount'] <= 0)
+# 3.4 车费金额异常：>=1000 或 <=0
+total_mask = (trips['total_amount'] >= 1000) | (trips['total_amount'] <= 0)
 total_anomalies = trips[total_mask]
-print(f"\n(4) 车费金额异常 (>=300 或 <=0): {len(total_anomalies)} 条")
+print(f"\n(4) 车费金额异常 (>=1000 或 <=0): {len(total_anomalies)} 条")
 if len(total_anomalies) > 0:
     print(f"    占比: {(len(total_anomalies)/len(trips)*100):.2f}%")
     if 'fare_amount' in trips.columns:
@@ -121,6 +121,7 @@ print("=" * 60)
 print(f"原始数据记录数: {len(trips)}")
 
 # 1. 删除所有包含NaN的行
+#理由：含NaN行的数据存在缺失，无法补回数据
 print("\n(1) 删除包含NaN的行...")
 initial_count = len(trips)
 trips = trips.dropna()
@@ -128,6 +129,7 @@ print(f"    删除了 {initial_count - len(trips)} 条记录")
 print(f"    剩余记录数: {len(trips)}")
 
 # 2. 删除passenger_count异常的记录 (<=0 或 >6)
+#乘客数量超出物理限制，记录错误，无法找回真实值
 print("\n(2) 删除passenger_count异常的记录 (<=0 或 >6)...")
 initial_count = len(trips)
 mask_passenger = (trips['passenger_count'] <= 0) | (trips['passenger_count'] > 6)
@@ -136,6 +138,7 @@ print(f"    删除了 {initial_count - len(trips)} 条记录")
 print(f"    剩余记录数: {len(trips)}")
 
 # 3. 删除tpep_pickup_datetime >= tpep_dropoff_datetime的记录
+#上车时间晚于下车时间，登记错误顾删除数据
 print("\n(3) 删除上车时间 >= 下车时间的记录...")
 initial_count = len(trips)
 mask_time = trips['tpep_pickup_datetime'] >= trips['tpep_dropoff_datetime']
@@ -144,6 +147,7 @@ print(f"    删除了 {initial_count - len(trips)} 条记录")
 print(f"    剩余记录数: {len(trips)}")
 
 # 4. 处理trip_distance
+#行程距离<0或>350均为异常记录，>100可能是长途行程，故添加标签方便后续研究
 print("\n(4) 处理trip_distance...")
 # 4.1 删除trip_distance <= 0的记录
 initial_count = len(trips)
@@ -164,6 +168,7 @@ print(f"    添加long_trip标签: {long_trip_count} 条记录标记为长途行
 print(f"    剩余记录数: {len(trips)}")
 
 # 5. 处理total_amount：删除<=0和>=1000的记录
+#>=1000的路费过高，甚至超过长途旅行范围，故删除
 print("\n(5) 处理total_amount...")
 initial_count = len(trips)
 mask_total_invalid = (trips['total_amount'] <= 0) | (trips['total_amount'] >= 1000)
