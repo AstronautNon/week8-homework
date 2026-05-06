@@ -53,10 +53,10 @@ print(f"\n(1) 时间异常 (上车时间 >= 下车时间): {len(time_anomalies)}
 if len(time_anomalies) > 0:
     print(f"    占比: {(len(time_anomalies)/len(trips)*100):.2f}%")
 
-# 3.2 乘客数量异常：<=0 或 >=5
-passenger_mask = (trips['passenger_count'] <= 0) | (trips['passenger_count'] >= 5)
+# 3.2 乘客数量异常：<=0 或 >6
+passenger_mask = (trips['passenger_count'] <= 0) | (trips['passenger_count'] > 6)
 passenger_anomalies = trips[passenger_mask]
-print(f"\n(2) 乘客数量异常 (<=0 或 >=5): {len(passenger_anomalies)} 条")
+print(f"\n(2) 乘客数量异常 (<=0 或 >6): {len(passenger_anomalies)} 条")
 if len(passenger_anomalies) > 0:
     print(f"    占比: {(len(passenger_anomalies)/len(trips)*100):.2f}%")
     if 'passenger_count' in trips.columns:
