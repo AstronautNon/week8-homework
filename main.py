@@ -1,6 +1,16 @@
 #库导入区
 import pyarrow.parquet as pq
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib
+from matplotlib import font_manager
+import numpy as np
+
+# 设置中文字体
+matplotlib.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'STHeiti', 'Microsoft YaHei']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+
 
 #主函数区
 
@@ -257,3 +267,82 @@ print(trips[display_cols].head())
 print("\n" + "=" * 60)
 print("全部处理完成")
 print("=" * 60)
+
+
+
+# ==================== 可视化分析：出行需求时间分布 ====================
+print("\n\n" + "=" * 60)
+print("可视化分析：出行需求时间分布")
+print("=" * 60)
+
+# 1. 按小时统计平均订单量
+print("\n(1) 绘制小时平均订单量折线图...")
+hourly_orders = trips.groupby('pickup_hour').size()
+hourly_avg_orders = hourly_orders / len(trips['pickup_day'].unique())
+
+plt.figure(figsize=(14, 6))
+plt.plot(hourly_avg_orders.index, hourly_avg_orders.values, marker='o', linewidth=2,
+         markersize=6, color='#2E86AB')
+
+# 标注每个时间点的订单量
+for x, y in zip(hourly_avg_orders.index, hourly_avg_orders.values):
+    plt.annotate(f'{y:.1f}', xy=(x, y), xytext=(0, 8),
+                textcoords='offset points', ha='center', fontsize=9, color='#A23B72')
+
+plt.xlabel('小时 (Hour)', fontsize=12, fontweight='bold')
+plt.ylabel('平均订单量 (Average Orders)', fontsize=12, fontweight='bold')
+plt.title('每小时平均订单量分布', fontsize=14, fontweight='bold', pad=15)
+plt.xticks(range(0, 24))
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/hourly_order_distribution.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/hourly_order_distribution.png")
+plt.show()
+
+# 2. 工作日和周末平均订单量对比
+print("\n(2) 绘制工作日vs周末平均订单量柱状图...")
+# pickup_day: 1-5为工作日，6-7为周末
+trips['is_weekend'] = trips['pickup_day'].apply(lambda x: 1 if x >= 6 else 0)
+
+# 计算每天类型的订单量
+daily_orders = trips.groupby(['pickup_day', 'is_weekend']).size().reset_index(name='order_count')
+
+# 计算工作日和周末的平均订单量（按天数平均）
+workday_days = 5  # 周一到周五
+weekend_days = 2  # 周六和周日
+
+workday_total = daily_orders[daily_orders['is_weekend'] == 0]['order_count'].sum()
+weekend_total = daily_orders[daily_orders['is_weekend'] == 1]['order_count'].sum()
+
+workday_avg = workday_total / workday_days
+weekend_avg = weekend_total / weekend_days
+
+categories = ['工作日\n(Mon-Fri)', '周末\n(Sat-Sun)']
+avg_orders = [workday_avg, weekend_avg]
+colors = ['#2E86AB', '#F18F01']
+
+plt.figure(figsize=(10, 6))
+bars = plt.bar(categories, avg_orders, color=colors, width=0.5, edgecolor='black', linewidth=1.5)
+
+# 标注柱状图的数值
+for bar, value in zip(bars, avg_orders):
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2., height,
+            f'{value:.1f}',
+            ha='center', va='bottom', fontsize=12, fontweight='bold', color='#C73E1D')
+
+plt.xlabel('日期类型 (Day Type)', fontsize=12, fontweight='bold')
+plt.ylabel('平均订单量 (Average Orders)', fontsize=12, fontweight='bold')
+plt.title('工作日与周末平均订单量对比', fontsize=14, fontweight='bold', pad=15)
+plt.grid(axis='y', alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/workday_weekend_comparison.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/workday_weekend_comparison.png")
+plt.show()
+
+print("\n" + "=" * 60)
+print("可视化分析完成")
+print("=" * 60)
+print("生成的图表文件:")
+print("  1. output/hourly_order_distribution.png - 每小时平均订单量分布")
+print("  2. output/workday_weekend_comparison.png - 工作日与周末对比")
