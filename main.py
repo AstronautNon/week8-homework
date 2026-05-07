@@ -540,3 +540,82 @@ print("生成的图表文件:")
 print("  1. output/hour_vs_fare_scatter.png - 时段与车费关系")
 print("  2. output/hour_vs_tip_scatter.png - 时段与小费关系")
 print("  3. output/passenger_vs_fare_scatter.png - 乘客数与车费关系")
+
+# ==================== 可视化分析：长途旅行单位距离收益 ====================
+print("\n\n" + "=" * 60)
+print("可视化分析：长途旅行单位距离收益")
+print("=" * 60)
+
+# 1. 每一趟长途旅行的单位距离收益
+print("\n(1) 绘制每趟长途旅行的单位距离收益柱状图...")
+long_trip_data = trips[trips['long_trip'] == 1].copy()
+
+if len(long_trip_data) > 0:
+    plt.figure(figsize=(16, 8))
+    x_pos = range(len(long_trip_data))
+
+    bars = plt.bar(x_pos, long_trip_data['pre_distance_profit'].values,
+                   color='#A23B72', edgecolor='black', linewidth=0.5)
+
+    # 标注每根柱子的数值（每隔一定数量标注，避免过于拥挤）
+    step = max(1, len(long_trip_data) // 50)  # 最多显示50个标注
+    for i, bar in enumerate(bars):
+        if i % step == 0:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width() / 2., height,
+                     f'{height:.2f}',
+                     ha='center', va='bottom', fontsize=8, fontweight='bold', color='#C73E1D')
+
+    plt.xlabel('长途旅行序号 (Long Trip Index)', fontsize=12, fontweight='bold')
+    plt.ylabel('单位距离收益 ($/mile)', fontsize=12, fontweight='bold')
+    plt.title(f'每趟长途旅行的单位距离收益 (共{len(long_trip_data)}趟)',
+              fontsize=14, fontweight='bold', pad=15)
+    plt.grid(axis='y', alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    plt.savefig('output/long_trip_profit_detail.png', dpi=300, bbox_inches='tight')
+    print(f"    已保存: output/long_trip_profit_detail.png")
+    plt.show()
+else:
+    print("    警告: 未找到长途旅行数据")
+
+# 2. 长途与非长途平均单位距离收益对比
+print("\n(2) 绘制长途与非长途平均单位距离收益对比柱状图...")
+# 计算长途旅行的平均单位距离收益
+long_trip_avg_profit = trips[trips['long_trip'] == 1]['pre_distance_profit'].mean()
+# 计算非长途旅行的平均单位距离收益
+normal_trip_avg_profit = trips[trips['long_trip'] == 0]['pre_distance_profit'].mean()
+
+categories = ['长途旅行\n(Long Trip)', '非长途旅行\n(Normal Trip)']
+avg_profits = [long_trip_avg_profit, normal_trip_avg_profit]
+colors = ['#A23B72', '#2E86AB']
+
+plt.figure(figsize=(10, 6))
+bars = plt.bar(categories, avg_profits, color=colors, width=0.5,
+               edgecolor='black', linewidth=1.5)
+
+# 标注柱状图的数值
+for bar, value in zip(bars, avg_profits):
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width() / 2., height,
+             f'{value:.2f}',
+             ha='center', va='bottom', fontsize=12, fontweight='bold', color='#C73E1D')
+
+plt.xlabel('旅行类型 (Trip Type)', fontsize=12, fontweight='bold')
+plt.ylabel('平均单位距离收益 ($/mile)', fontsize=12, fontweight='bold')
+plt.title('长途与非长途旅行平均单位距离收益对比', fontsize=14, fontweight='bold', pad=15)
+plt.grid(axis='y', alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/long_vs_normal_profit_comparison.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/long_vs_normal_profit_comparison.png")
+plt.show()
+
+print("\n" + "=" * 60)
+print("长途旅行单位距离收益分析完成")
+print("=" * 60)
+print("生成的图表文件:")
+print("  1. output/long_trip_profit_detail.png - 每趟长途旅行的单位距离收益")
+print("  2. output/long_vs_normal_profit_comparison.png - 长途与非长途平均收益对比")
+print(f"\n统计信息:")
+print(f"  长途旅行平均单位距离收益: ${long_trip_avg_profit:.2f}/mile")
+print(f"  非长途旅行平均单位距离收益: ${normal_trip_avg_profit:.2f}/mile")
+print(f"  差异: ${abs(long_trip_avg_profit - normal_trip_avg_profit):.2f}/mile")
