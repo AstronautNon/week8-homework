@@ -479,3 +479,64 @@ print("生成的图表文件:")
 print("  1. output/pickup_location_heatmap.png - 上客热度分布 TOP 10")
 print("  2. output/dropoff_location_heatmap.png - 下客热度分布 TOP 10")
 
+
+
+# ==================== 可视化分析：车费影响因素 ====================
+print("\n\n" + "=" * 60)
+print("可视化分析：车费影响因素")
+print("=" * 60)
+
+# 1. 时段-车费散点图
+print("\n(1) 绘制时段-车费散点图...")
+plt.figure(figsize=(14, 8))
+plt.scatter(trips['pickup_hour'], trips['fare_amount'],
+           alpha=0.3, s=20, color='#2E86AB', edgecolors='none')
+
+plt.xlabel('上车时段 (Pickup Hour)', fontsize=12, fontweight='bold')
+plt.ylabel('车费金额 (Fare Amount $)', fontsize=12, fontweight='bold')
+plt.title('时段与车费关系散点图', fontsize=14, fontweight='bold', pad=15)
+plt.xticks(range(0, 24))
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/hour_vs_fare_scatter.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/hour_vs_fare_scatter.png")
+plt.show()
+
+# 2. 时段-小费散点图
+print("\n(2) 绘制时段-小费散点图...")
+plt.figure(figsize=(14, 8))
+plt.scatter(trips['pickup_hour'], trips['tip_amount'],
+           alpha=0.3, s=20, color='#F18F01', edgecolors='none')
+
+plt.xlabel('上车时段 (Pickup Hour)', fontsize=12, fontweight='bold')
+plt.ylabel('小费金额 (Tip Amount $)', fontsize=12, fontweight='bold')
+plt.title('时段与小费关系散点图', fontsize=14, fontweight='bold', pad=15)
+plt.xticks(range(0, 24))
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/hour_vs_tip_scatter.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/hour_vs_tip_scatter.png")
+plt.show()
+
+# 3. 乘客数-车费散点图
+print("\n(3) 绘制乘客数-车费散点图...")
+plt.figure(figsize=(14, 8))
+plt.scatter(trips['passenger_count'], trips['fare_amount'],
+           alpha=0.3, s=20, color='#A23B72', edgecolors='none')
+
+plt.xlabel('乘客数量 (Passenger Count)', fontsize=12, fontweight='bold')
+plt.ylabel('车费金额 (Fare Amount $)', fontsize=12, fontweight='bold')
+plt.title('乘客数量与车费关系散点图', fontsize=14, fontweight='bold', pad=15)
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/passenger_vs_fare_scatter.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/passenger_vs_fare_scatter.png")
+plt.show()
+
+print("\n" + "=" * 60)
+print("车费影响因素分析完成")
+print("=" * 60)
+print("生成的图表文件:")
+print("  1. output/hour_vs_fare_scatter.png - 时段与车费关系")
+print("  2. output/hour_vs_tip_scatter.png - 时段与小费关系")
+print("  3. output/passenger_vs_fare_scatter.png - 乘客数与车费关系")
