@@ -346,3 +346,136 @@ print("=" * 60)
 print("生成的图表文件:")
 print("  1. output/hourly_order_distribution.png - 每小时平均订单量分布")
 print("  2. output/workday_weekend_comparison.png - 工作日与周末对比")
+
+
+
+# ==================== 可视化分析：区域热度分布 ====================
+print("\n\n" + "=" * 60)
+print("可视化分析：区域热度分布")
+print("=" * 60)
+
+# 1. 上客热度分布（PULocationID）
+print("\n(1) 绘制上客热度分布堆叠柱状图...")
+# 获取前10个订单量最多的上客点
+top10_pickup = trips['PULocationID'].value_counts().head(10).index.tolist()
+
+# 筛选出这10个上客点的数据
+pickup_data = trips[trips['PULocationID'].isin(top10_pickup)]
+
+# 按上客点和是否高峰期统计订单量
+pickup_peak_stats = pickup_data.groupby(['PULocationID', 'is_peak']).size().unstack(fill_value=0)
+pickup_peak_stats.columns = ['off_peak', 'peak']  # 0=非高峰，1=高峰
+
+# 按总订单量排序
+pickup_peak_stats['total'] = pickup_peak_stats['peak'] + pickup_peak_stats['off_peak']
+pickup_peak_stats = pickup_peak_stats.sort_values(by='total', ascending=False)
+
+# 绘制堆叠柱状图
+plt.figure(figsize=(16, 8))
+x_pos = range(len(pickup_peak_stats.index))
+bar_width = 0.6
+
+# 下半部分：非高峰期（蓝色系）
+bars_off_peak = plt.bar(x_pos, pickup_peak_stats['off_peak'], bar_width,
+                        label='非高峰期', color='#2E86AB', edgecolor='black', linewidth=0.5)
+
+# 上半部分：高峰期（红色系）
+bars_peak = plt.bar(x_pos, pickup_peak_stats['peak'], bar_width, bottom=pickup_peak_stats['off_peak'],
+                    label='高峰期', color='#C73E1D', edgecolor='black', linewidth=0.5)
+
+# 标注非高峰期的订单量
+for bar in bars_off_peak:
+    height = bar.get_height()
+    if height > 0:
+        plt.text(bar.get_x() + bar.get_width()/2., bar.get_y() + height/2.,
+                f'{int(height)}', ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+
+# 标注高峰期的订单量
+for bar in bars_peak:
+    height = bar.get_height()
+    if height > 0:
+        plt.text(bar.get_x() + bar.get_width()/2., bar.get_y() + height/2.,
+                f'{int(height)}', ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+
+# 标注每根柱子的总订单量
+for i, (idx, row) in enumerate(pickup_peak_stats.iterrows()):
+    plt.text(i, row['total'] + 50, f'{int(row["total"])}',
+            ha='center', va='bottom', fontsize=10, fontweight='bold', color='#1A1A2E')
+
+plt.xlabel('上客点ID (Pickup Location ID)', fontsize=12, fontweight='bold')
+plt.ylabel('订单量 (Order Count)', fontsize=12, fontweight='bold')
+plt.title('上客热度分布 TOP 10', fontsize=14, fontweight='bold', pad=15)
+plt.xticks(x_pos, [str(int(id)) for id in pickup_peak_stats.index], rotation=45, ha='right')
+plt.legend(loc='upper right', fontsize=10)
+plt.grid(axis='y', alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/pickup_location_heatmap.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/pickup_location_heatmap.png")
+plt.show()
+
+# 2. 下客热度分布（DOLocationID）
+print("\n(2) 绘制下客热度分布堆叠柱状图...")
+# 获取前10个订单量最多的下客点
+top10_dropoff = trips['DOLocationID'].value_counts().head(10).index.tolist()
+
+# 筛选出这10个下客点的数据
+dropoff_data = trips[trips['DOLocationID'].isin(top10_dropoff)]
+
+# 按下客点和是否高峰期统计订单量
+dropoff_peak_stats = dropoff_data.groupby(['DOLocationID', 'is_peak']).size().unstack(fill_value=0)
+dropoff_peak_stats.columns = ['off_peak', 'peak']  # 0=非高峰，1=高峰
+
+# 按总订单量排序
+dropoff_peak_stats['total'] = dropoff_peak_stats['peak'] + dropoff_peak_stats['off_peak']
+dropoff_peak_stats = dropoff_peak_stats.sort_values(by='total', ascending=False)
+
+# 绘制堆叠柱状图
+plt.figure(figsize=(16, 8))
+x_pos = range(len(dropoff_peak_stats.index))
+bar_width = 0.6
+
+# 下半部分：非高峰期（蓝色系）
+bars_off_peak = plt.bar(x_pos, dropoff_peak_stats['off_peak'], bar_width,
+                        label='非高峰期', color='#2E86AB', edgecolor='black', linewidth=0.5)
+
+# 上半部分：高峰期（红色系）
+bars_peak = plt.bar(x_pos, dropoff_peak_stats['peak'], bar_width, bottom=dropoff_peak_stats['off_peak'],
+                    label='高峰期', color='#C73E1D', edgecolor='black', linewidth=0.5)
+
+# 标注非高峰期的订单量
+for bar in bars_off_peak:
+    height = bar.get_height()
+    if height > 0:
+        plt.text(bar.get_x() + bar.get_width()/2., bar.get_y() + height/2.,
+                f'{int(height)}', ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+
+# 标注高峰期的订单量
+for bar in bars_peak:
+    height = bar.get_height()
+    if height > 0:
+        plt.text(bar.get_x() + bar.get_width()/2., bar.get_y() + height/2.,
+                f'{int(height)}', ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+
+# 标注每根柱子的总订单量
+for i, (idx, row) in enumerate(dropoff_peak_stats.iterrows()):
+    plt.text(i, row['total'] + 50, f'{int(row["total"])}',
+            ha='center', va='bottom', fontsize=10, fontweight='bold', color='#1A1A2E')
+
+plt.xlabel('下客点ID (Dropoff Location ID)', fontsize=12, fontweight='bold')
+plt.ylabel('订单量 (Order Count)', fontsize=12, fontweight='bold')
+plt.title('下客热度分布 TOP 10', fontsize=14, fontweight='bold', pad=15)
+plt.xticks(x_pos, [str(int(id)) for id in dropoff_peak_stats.index], rotation=45, ha='right')
+plt.legend(loc='upper right', fontsize=10)
+plt.grid(axis='y', alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/dropoff_location_heatmap.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/dropoff_location_heatmap.png")
+plt.show()
+
+print("\n" + "=" * 60)
+print("区域热度分布分析完成")
+print("=" * 60)
+print("生成的图表文件:")
+print("  1. output/pickup_location_heatmap.png - 上客热度分布 TOP 10")
+print("  2. output/dropoff_location_heatmap.png - 下客热度分布 TOP 10")
+
