@@ -636,3 +636,87 @@ def TOP10_DOLocationID(trips_data):
     print("=" * 60)
 
     return result_dict
+
+
+def hour_vs_fare(trips_data):
+    """
+    研究时段对车费影响的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'pickup_hour'和'fare_amount'列
+
+    返回:
+    dict: 包含每个时段的平均车费统计信息
+    """
+    print("\n\n" + "=" * 60)
+    print("车费影响因素分析：时段与车费关系")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'pickup_hour' not in trips_data.columns:
+        raise ValueError("数据中缺少'pickup_hour'列，请先进行特征工程")
+    if 'fare_amount' not in trips_data.columns:
+        raise ValueError("数据中缺少'fare_amount'列")
+
+    # 计算每个时段的平均车费
+    hourly_fare_stats = trips_data.groupby('pickup_hour')['fare_amount'].agg(['mean', 'median', 'count']).round(2)
+    hourly_fare_stats.columns = ['avg_fare', 'median_fare', 'trip_count']
+
+    # 输出时段车费统计信息
+    print("\n各时段车费统计:")
+    print("-" * 55)
+    print(f"{'时段':<8} {'平均车费($)':<12} {'中位数车费($)':<14} {'订单数量':<10}")
+    print("-" * 55)
+
+    result_dict = {}
+    for hour in range(24):
+        if hour in hourly_fare_stats.index:
+            avg_fare = hourly_fare_stats.loc[hour, 'avg_fare']
+            median_fare = hourly_fare_stats.loc[hour, 'median_fare']
+            trip_count = int(hourly_fare_stats.loc[hour, 'trip_count'])
+
+            print(f"{hour:02d}:00   {avg_fare:<12.2f} {median_fare:<14.2f} {trip_count:<10}")
+
+            result_dict[hour] = {
+                'avg_fare': float(avg_fare),
+                'median_fare': float(median_fare),
+                'trip_count': trip_count
+            }
+        else:
+            print(f"{hour:02d}:00   {'N/A':<12} {'N/A':<14} {0:<10}")
+            result_dict[hour] = {
+                'avg_fare': None,
+                'median_fare': None,
+                'trip_count': 0
+            }
+
+    # 图片路径
+    image_path = 'output/hour_vs_fare_scatter.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("时段与车费关系分析完成")
+    print("=" * 60)
+
+    return result_dict
