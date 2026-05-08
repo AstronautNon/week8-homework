@@ -1,6 +1,6 @@
 #库导入区
 import pyarrow.parquet as pq
-from functions import generate_data_quality_report, clean_data, feature_engineering, analyze_hour_distribution, analyze_workday_weekend_distribution
+from functions import generate_data_quality_report, clean_data, feature_engineering, analyze_hour_distribution, analyze_workday_weekend_distribution, TOP10_PULocationID
 
 
 #主函数区
@@ -18,4 +18,5 @@ print(f"数据读取完成，共 {len(trips)} 条记录\n")
 trips_cleaned, cleaning_stats = clean_data(trips, original_trips)
 trips_featured, feature_stats = feature_engineering(trips_cleaned)
 #hourly_avg = analyze_hour_distribution(trips_featured)
-workday_weekend_stats = analyze_workday_weekend_distribution(trips_featured)
+#workday_weekend_stats = analyze_workday_weekend_distribution(trips_featured)
+top10_pickup_stats = TOP10_PULocationID(trips_featured)
