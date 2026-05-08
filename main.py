@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-
+from sklearn.ensemble import RandomForestRegressor
 
 
 
@@ -949,3 +949,276 @@ print("生成的文件:")
 print("  1. output/model_training_curves.png - 模型训练曲线")
 print("  2. output/prediction_vs_actual.png - 预测vs实际值对比")
 print("  3. output/demand_prediction_model.pth - 训练好的模型 (PyTorch)")
+
+
+
+# ==================== 机器学习：随机森林预测模型 ====================
+print("\n\n" + "=" * 60)
+print("机器学习：随机森林预测模型")
+print("=" * 60)
+
+# 1. 找出订单量最高的上客点（与神经网络相同）
+print("\n(1) 筛选订单量最高的上客点...")
+pickup_counts = trips['PULocationID'].value_counts()
+top_pickup_id = pickup_counts.index[0]
+print(f"    订单量最高的上客点ID: {top_pickup_id}")
+
+# 筛选出该上客点的数据
+top_pickup_data = trips[trips['PULocationID'] == top_pickup_id].copy()
+
+# 2. 提取日期信息并构建特征
+print("\n(2) 构建特征数据集...")
+top_pickup_data['date'] = top_pickup_data['tpep_pickup_datetime'].dt.date
+top_pickup_data['day_of_month'] = top_pickup_data['tpep_pickup_datetime'].dt.day
+top_pickup_data['hour'] = top_pickup_data['tpep_pickup_datetime'].dt.hour
+top_pickup_data['day_of_week'] = top_pickup_data['tpep_pickup_datetime'].dt.dayofweek + 1
+
+# 按天-小时聚合订单量
+hourly_demand = top_pickup_data.groupby(['date', 'day_of_month', 'day_of_week', 'hour']).size().reset_index(name='order_count')
+print(f"    聚合后的数据量: {len(hourly_demand)}")
+
+# 3. 划分训练集和测试集
+print("\n(3) 划分训练集和测试集...")
+train_data = hourly_demand[hourly_demand['day_of_month'] <= 25].copy()
+test_data = hourly_demand[hourly_demand['day_of_month'] >= 26].copy()
+
+print(f"    训练集大小: {len(train_data)} (1月1日-1月25日)")
+print(f"    测试集大小: {len(test_data)} (1月26日-1月31日)")
+
+# 4. 准备特征和标签
+print("\n(4) 准备特征和标签...")
+feature_columns = ['day_of_month', 'day_of_week', 'hour']
+X_train_rf = train_data[feature_columns].values
+y_train_rf = train_data['order_count'].values
+X_test_rf = test_data[feature_columns].values
+y_test_rf = test_data['order_count'].values
+
+# 5. 训练随机森林模型
+print("\n(5) 训练随机森林模型...")
+rf_model = RandomForestRegressor(
+    n_estimators=100,
+    max_depth=10,
+    min_samples_split=5,
+    min_samples_leaf=2,
+    random_state=42,
+    n_jobs=-1
+)
+
+rf_model.fit(X_train_rf, y_train_rf)
+print("    随机森林模型训练完成")
+
+# 6. 在测试集上进行预测
+print("\n(6) 在测试集上进行预测...")
+y_pred_rf = rf_model.predict(X_test_rf)
+y_pred_rf = np.maximum(y_pred_rf, 0)  # 确保非负
+
+# 7. 计算评估指标
+print("\n(7) 计算评估指标...")
+mae_rf = mean_absolute_error(y_test_rf, y_pred_rf)
+rmse_rf = np.sqrt(mean_squared_error(y_test_rf, y_pred_rf))
+
+print(f"\n{'='*60}")
+print("随机森林测试集评估报告")
+print(f"{'='*60}")
+print(f"  MAE (平均绝对误差): {mae_rf:.2f} 订单/小时")
+print(f"  RMSE (均方根误差): {rmse_rf:.2f} 订单/小时")
+print(f"  测试集实际订单量范围: [{y_test_rf.min():.0f}, {y_test_rf.max():.0f}]")
+print(f"  测试集预测订单量范围: [{y_pred_rf.min():.2f}, {y_pred_rf.max():.2f}]")
+
+# 8. 预测1月30日17时的订单量
+print("\n(8) 预测1月30日17时的订单量...")
+jan_30_date = pd.Timestamp('2023-01-30')
+jan_30_day_of_week = jan_30_date.dayofweek + 1
+jan_30_day_of_month = 30
+jan_30_hour = 17
+
+predict_input_rf = np.array([[jan_30_day_of_month, jan_30_day_of_week, jan_30_hour]])
+predicted_demand_rf = rf_model.predict(predict_input_rf)[0]
+predicted_demand_rf = max(0, predicted_demand_rf)
+
+print(f"\n{'='*60}")
+print("随机森林预测结果")
+print(f"{'='*60}")
+print(f"  上客点ID: {top_pickup_id}")
+print(f"  预测时间: 2023年1月30日 17:00")
+print(f"  预测订单量: {predicted_demand_rf:.2f} 单")
+print(f"{'='*60}")
+
+# 9. 保存随机森林模型
+print("\n(9) 保存随机森林模型...")
+import joblib
+joblib.dump(rf_model, 'output/random_forest_model.pkl')
+print("    模型已保存: output/random_forest_model.pkl")
+
+print("\n" + "=" * 60)
+print("随机森林预测模型完成")
+print("=" * 60)
+
+
+# ==================== 模型对比：神经网络 vs 随机森林 ====================
+print("\n\n" + "=" * 60)
+print("模型对比：神经网络 vs 随机森林")
+print("=" * 60)
+
+# 重新获取神经网络的预测结果（使用之前训练好的模型）
+model.eval()
+with torch.no_grad():
+    y_pred_nn_scaled = model(X_test_tensor).numpy().flatten()
+    y_pred_nn = scaler_y.inverse_transform(y_pred_nn_scaled.reshape(-1, 1)).flatten()
+    y_pred_nn = np.maximum(y_pred_nn, 0)
+
+# 计算神经网络的评估指标
+mae_nn = mean_absolute_error(y_test, y_pred_nn)
+rmse_nn = np.sqrt(mean_squared_error(y_test, y_pred_nn))
+
+print(f"\n{'='*60}")
+print("模型性能对比")
+print(f"{'='*60}")
+print(f"\n{'指标':<20} {'神经网络':<15} {'随机森林':<15} {'差异':<15}")
+print(f"{'-'*60}")
+print(f"{'MAE':<20} {mae_nn:<15.2f} {mae_rf:<15.2f} {abs(mae_nn - mae_rf):<15.2f}")
+print(f"{'RMSE':<20} {rmse_nn:<15.2f} {rmse_rf:<15.2f} {abs(rmse_nn - rmse_rf):<15.2f}")
+print(f"{'='*60}")
+
+# 确定哪个模型更好
+if mae_nn < mae_rf:
+    better_mae = "神经网络"
+else:
+    better_mae = "随机森林"
+
+if rmse_nn < rmse_rf:
+    better_rmse = "神经网络"
+else:
+    better_rmse = "随机森林"
+
+print(f"\nMAE更优的模型: {better_mae}")
+print(f"RMSE更优的模型: {better_rmse}")
+
+# 1. 绘制MAE和RMSE对比柱状图
+print("\n(1) 绘制MAE和RMSE对比柱状图...")
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+models = ['神经网络\n(Neural Network)', '随机森林\n(Random Forest)']
+mae_values = [mae_nn, mae_rf]
+rmse_values = [rmse_nn, rmse_rf]
+colors = ['#2E86AB', '#F18F01']
+
+# MAE对比
+bars1 = axes[0].bar(models, mae_values, color=colors, width=0.5, edgecolor='black', linewidth=1.5)
+for bar, value in zip(bars1, mae_values):
+    height = bar.get_height()
+    axes[0].text(bar.get_x() + bar.get_width()/2., height,
+                f'{value:.2f}',
+                ha='center', va='bottom', fontsize=12, fontweight='bold', color='#C73E1D')
+axes[0].set_ylabel('MAE (订单/小时)', fontsize=12, fontweight='bold')
+axes[0].set_title('MAE 对比', fontsize=14, fontweight='bold')
+axes[0].grid(axis='y', alpha=0.3, linestyle='--')
+
+# RMSE对比
+bars2 = axes[1].bar(models, rmse_values, color=colors, width=0.5, edgecolor='black', linewidth=1.5)
+for bar, value in zip(bars2, rmse_values):
+    height = bar.get_height()
+    axes[1].text(bar.get_x() + bar.get_width()/2., height,
+                f'{value:.2f}',
+                ha='center', va='bottom', fontsize=12, fontweight='bold', color='#C73E1D')
+axes[1].set_ylabel('RMSE (订单/小时)', fontsize=12, fontweight='bold')
+axes[1].set_title('RMSE 对比', fontsize=14, fontweight='bold')
+axes[1].grid(axis='y', alpha=0.3, linestyle='--')
+
+plt.tight_layout()
+plt.savefig('output/model_comparison_mae_rmse.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/model_comparison_mae_rmse.png")
+plt.show()
+
+# 2. 绘制预测vs实际值对比图（两个模型）
+print("\n(2) 绘制预测vs实际值对比图...")
+plt.figure(figsize=(16, 6))
+x_axis = range(len(y_test))
+
+plt.plot(x_axis, y_test, marker='o', markersize=4, linewidth=2, label='实际值', color='#1A1A2E', alpha=0.7)
+plt.plot(x_axis, y_pred_nn, marker='s', markersize=3, linewidth=1.5, label=f'神经网络预测 (MAE={mae_nn:.2f})', color='#2E86AB')
+plt.plot(x_axis, y_pred_rf, marker='^', markersize=3, linewidth=1.5, label=f'随机森林预测 (MAE={mae_rf:.2f})', color='#F18F01')
+
+plt.xlabel('测试集样本序号', fontsize=12, fontweight='bold')
+plt.ylabel('订单量 (Orders)', fontsize=12, fontweight='bold')
+plt.title(f'两种模型预测结果对比 (上客点ID: {top_pickup_id})', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10, loc='best')
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/model_prediction_comparison.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/model_prediction_comparison.png")
+plt.show()
+
+# 3. 绘制误差分布对比图
+print("\n(3) 绘制误差分布对比图...")
+errors_nn = y_test - y_pred_nn
+errors_rf = y_test - y_pred_rf
+
+plt.figure(figsize=(14, 6))
+
+plt.subplot(1, 2, 1)
+plt.hist(errors_nn, bins=30, alpha=0.7, color='#2E86AB', edgecolor='black', linewidth=1.5, label=f'神经网络 (MAE={mae_nn:.2f})')
+plt.axvline(x=0, color='red', linestyle='--', linewidth=2, label='零误差线')
+plt.xlabel('预测误差 (Orders)', fontsize=12, fontweight='bold')
+plt.ylabel('频次', fontsize=12, fontweight='bold')
+plt.title('神经网络误差分布', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.subplot(1, 2, 2)
+plt.hist(errors_rf, bins=30, alpha=0.7, color='#F18F01', edgecolor='black', linewidth=1.5, label=f'随机森林 (MAE={mae_rf:.2f})')
+plt.axvline(x=0, color='red', linestyle='--', linewidth=2, label='零误差线')
+plt.xlabel('预测误差 (Orders)', fontsize=12, fontweight='bold')
+plt.ylabel('频次', fontsize=12, fontweight='bold')
+plt.title('随机森林误差分布', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.tight_layout()
+plt.savefig('output/model_error_distribution.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/model_error_distribution.png")
+plt.show()
+
+# 4. 绘制散点对比图（实际值vs预测值）
+print("\n(4) 绘制实际值vs预测值散点图...")
+plt.figure(figsize=(14, 6))
+
+plt.subplot(1, 2, 1)
+plt.scatter(y_test, y_pred_nn, alpha=0.6, s=50, color='#2E86AB', edgecolors='black', linewidth=0.5)
+min_val = min(y_test.min(), y_pred_nn.min())
+max_val = max(y_test.max(), y_pred_nn.max())
+plt.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='理想预测线')
+plt.xlabel('实际订单量', fontsize=12, fontweight='bold')
+plt.ylabel('预测订单量 (神经网络)', fontsize=12, fontweight='bold')
+plt.title(f'神经网络: R² = {1 - (np.sum((y_test - y_pred_nn)**2) / np.sum((y_test - y_test.mean())**2)):.4f}', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.subplot(1, 2, 2)
+plt.scatter(y_test, y_pred_rf, alpha=0.6, s=50, color='#F18F01', edgecolors='black', linewidth=0.5)
+min_val = min(y_test.min(), y_pred_rf.min())
+max_val = max(y_test.max(), y_pred_rf.max())
+plt.plot([min_val, max_val], [min_val, max_val], 'r--', linewidth=2, label='理想预测线')
+plt.xlabel('实际订单量', fontsize=12, fontweight='bold')
+plt.ylabel('预测订单量 (随机森林)', fontsize=12, fontweight='bold')
+plt.title(f'随机森林: R² = {1 - (np.sum((y_test - y_pred_rf)**2) / np.sum((y_test - y_test.mean())**2)):.4f}', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.tight_layout()
+plt.savefig('output/model_scatter_comparison.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/model_scatter_comparison.png")
+plt.show()
+
+print("\n" + "=" * 60)
+print("模型对比分析完成")
+print("=" * 60)
+print("生成的对比图表:")
+print("  1. output/model_comparison_mae_rmse.png - MAE和RMSE对比柱状图")
+print("  2. output/model_prediction_comparison.png - 预测结果对比图")
+print("  3. output/model_error_distribution.png - 误差分布对比图")
+print("  4. output/model_scatter_comparison.png - 实际值vs预测值散点图")
+print(f"\n最终预测结果对比 (1月30日17时):")
+print(f"  神经网络预测: {predicted_demand:.2f} 单")
+print(f"  随机森林预测: {predicted_demand_rf:.2f} 单")
+print(f"  差异: {abs(predicted_demand - predicted_demand_rf):.2f} 单")
