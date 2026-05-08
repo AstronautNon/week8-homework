@@ -277,7 +277,7 @@ print("全部处理完成")
 print("=" * 60)
 
 
-'''
+
 # ==================== 可视化分析：出行需求时间分布 ====================
 print("\n\n" + "=" * 60)
 print("可视化分析：出行需求时间分布")
@@ -629,7 +629,7 @@ print(f"\n统计信息:")
 print(f"  长途旅行平均单位距离收益: ${long_trip_avg_profit:.2f}/mile")
 print(f"  非长途旅行平均单位距离收益: ${normal_trip_avg_profit:.2f}/mile")
 print(f"  差异: ${abs(long_trip_avg_profit - normal_trip_avg_profit):.2f}/mile")
-'''
+
 
 # ==================== 机器学习：出行需求预测模型 (PyTorch) ====================
 print("\n\n" + "=" * 60)
