@@ -5,6 +5,14 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import font_manager
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+
+
 
 # 设置中文字体
 matplotlib.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'STHeiti', 'Microsoft YaHei']
@@ -269,7 +277,7 @@ print("全部处理完成")
 print("=" * 60)
 
 
-
+'''
 # ==================== 可视化分析：出行需求时间分布 ====================
 print("\n\n" + "=" * 60)
 print("可视化分析：出行需求时间分布")
@@ -541,6 +549,8 @@ print("  1. output/hour_vs_fare_scatter.png - 时段与车费关系")
 print("  2. output/hour_vs_tip_scatter.png - 时段与小费关系")
 print("  3. output/passenger_vs_fare_scatter.png - 乘客数与车费关系")
 
+
+
 # ==================== 可视化分析：长途旅行单位距离收益 ====================
 print("\n\n" + "=" * 60)
 print("可视化分析：长途旅行单位距离收益")
@@ -619,3 +629,323 @@ print(f"\n统计信息:")
 print(f"  长途旅行平均单位距离收益: ${long_trip_avg_profit:.2f}/mile")
 print(f"  非长途旅行平均单位距离收益: ${normal_trip_avg_profit:.2f}/mile")
 print(f"  差异: ${abs(long_trip_avg_profit - normal_trip_avg_profit):.2f}/mile")
+'''
+
+# ==================== 机器学习：出行需求预测模型 (PyTorch) ====================
+print("\n\n" + "=" * 60)
+print("机器学习：出行需求预测模型 (PyTorch)")
+print("=" * 60)
+
+# 1. 找出订单量最高的上客点
+print("\n(1) 筛选订单量最高的上客点...")
+pickup_counts = trips['PULocationID'].value_counts()
+top_pickup_id = pickup_counts.index[0]
+top_pickup_count = pickup_counts.iloc[0]
+print(f"    订单量最高的上客点ID: {top_pickup_id}")
+print(f"    总订单数: {top_pickup_count}")
+
+# 筛选出该上客点的数据
+top_pickup_data = trips[trips['PULocationID'] == top_pickup_id].copy()
+print(f"    筛选后数据量: {len(top_pickup_data)}")
+
+# 2. 提取日期信息并构建特征
+print("\n(2) 构建特征数据集...")
+top_pickup_data['date'] = top_pickup_data['tpep_pickup_datetime'].dt.date
+top_pickup_data['day_of_month'] = top_pickup_data['tpep_pickup_datetime'].dt.day
+top_pickup_data['hour'] = top_pickup_data['tpep_pickup_datetime'].dt.hour
+top_pickup_data['day_of_week'] = top_pickup_data['tpep_pickup_datetime'].dt.dayofweek + 1
+
+# 按天-小时聚合订单量
+hourly_demand = top_pickup_data.groupby(['date', 'day_of_month', 'day_of_week', 'hour']).size().reset_index(
+    name='order_count')
+print(f"    聚合后的数据量: {len(hourly_demand)}")
+
+# 3. 划分训练集和测试集（1.1-1.25为训练集，1.26-1.31为测试集）
+print("\n(3) 划分训练集和测试集...")
+train_data = hourly_demand[hourly_demand['day_of_month'] <= 25].copy()
+test_data = hourly_demand[hourly_demand['day_of_month'] >= 26].copy()
+
+print(f"    训练集大小: {len(train_data)} (1月1日-1月25日)")
+print(f"    测试集大小: {len(test_data)} (1月26日-1月31日)")
+
+# 4. 准备特征和标签
+print("\n(4) 准备特征和标签...")
+feature_columns = ['day_of_month', 'day_of_week', 'hour']
+X_train = train_data[feature_columns].values
+y_train = train_data['order_count'].values
+X_test = test_data[feature_columns].values
+y_test = test_data['order_count'].values
+
+# 5. 特征标准化
+print("\n(5) 特征标准化...")
+scaler_X = StandardScaler()
+scaler_y = StandardScaler()
+
+X_train_scaled = scaler_X.fit_transform(X_train)
+X_test_scaled = scaler_X.transform(X_test)
+y_train_scaled = scaler_y.fit_transform(y_train.reshape(-1, 1)).flatten()
+y_test_scaled = scaler_y.transform(y_test.reshape(-1, 1)).flatten()
+
+print(f"    训练集特征形状: {X_train_scaled.shape}")
+print(f"    测试集特征形状: {X_test_scaled.shape}")
+
+# 6. 转换为PyTorch张量
+print("\n(6) 转换为PyTorch张量...")
+X_train_tensor = torch.FloatTensor(X_train_scaled)
+y_train_tensor = torch.FloatTensor(y_train_scaled).unsqueeze(1)
+X_test_tensor = torch.FloatTensor(X_test_scaled)
+y_test_tensor = torch.FloatTensor(y_test_scaled).unsqueeze(1)
+
+# 创建DataLoader
+train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+print(f"    训练批次数量: {len(train_loader)}")
+
+# 7. 定义神经网络模型
+print("\n(7) 定义神经网络模型...")
+
+
+class DemandPredictionModel(nn.Module):
+    def __init__(self, input_size=3):
+        super(DemandPredictionModel, self).__init__()
+        self.network = nn.Sequential(
+            nn.Linear(input_size, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+    def forward(self, x):
+        return self.network(x)
+
+
+# 初始化模型
+model = DemandPredictionModel(input_size=3)
+print(model)
+
+# 8. 定义损失函数和优化器
+criterion = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# 9. 训练模型
+print("\n(8) 训练模型...")
+num_epochs = 100
+patience = 10
+best_val_loss = float('inf')
+patience_counter = 0
+
+train_losses = []
+val_losses = []
+train_maes = []
+val_maes = []
+train_rmses = []
+val_rmses = []
+
+for epoch in range(num_epochs):
+    # 训练阶段
+    model.train()
+    epoch_train_loss = 0
+    epoch_train_mae = 0
+    epoch_train_mse = 0
+    num_batches = 0
+
+    for X_batch, y_batch in train_loader:
+        # 前向传播
+        outputs = model(X_batch)
+        loss = criterion(outputs, y_batch)
+
+        # 反向传播
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # 计算MAE和MSE
+        mae = torch.mean(torch.abs(outputs - y_batch))
+        mse = torch.mean((outputs - y_batch) ** 2)
+
+        epoch_train_loss += loss.item()
+        epoch_train_mae += mae.item()
+        epoch_train_mse += mse.item()
+        num_batches += 1
+
+    avg_train_loss = epoch_train_loss / num_batches
+    avg_train_mae = epoch_train_mae / num_batches
+    avg_train_mse = epoch_train_mse / num_batches
+    avg_train_rmse = np.sqrt(avg_train_mse)
+
+    # 验证阶段
+    model.eval()
+    with torch.no_grad():
+        val_outputs = model(X_test_tensor)
+        val_loss = criterion(val_outputs, y_test_tensor).item()
+        val_mae = torch.mean(torch.abs(val_outputs - y_test_tensor)).item()
+        val_mse = torch.mean((val_outputs - y_test_tensor) ** 2).item()
+        val_rmse = np.sqrt(val_mse)
+
+    train_losses.append(avg_train_loss)
+    val_losses.append(val_loss)
+    train_maes.append(avg_train_mae)
+    val_maes.append(val_mae)
+    train_rmses.append(avg_train_rmse)
+    val_rmses.append(val_rmse)
+
+    # 早停检查
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        patience_counter = 0
+        # 保存最佳模型
+        best_model_state = model.state_dict().copy()
+    else:
+        patience_counter += 1
+
+    if (epoch + 1) % 10 == 0:
+        print(f"    Epoch [{epoch + 1}/{num_epochs}], "
+              f"Train Loss: {avg_train_loss:.4f}, Train MAE: {avg_train_mae:.4f}, Train RMSE: {avg_train_rmse:.4f}, "
+              f"Val Loss: {val_loss:.4f}, Val MAE: {val_mae:.4f}, Val RMSE: {val_rmse:.4f}")
+
+    if patience_counter >= patience:
+        print(f"    早停触发于 epoch {epoch + 1}")
+        break
+
+# 恢复最佳模型
+if best_model_state:
+    model.load_state_dict(best_model_state)
+
+actual_epochs = len(train_losses)
+print(f"\n    实际训练轮数: {actual_epochs}")
+
+# 10. 绘制Loss曲线
+print("\n(9) 绘制Loss曲线...")
+plt.figure(figsize=(18, 5))
+
+plt.subplot(1, 3, 1)
+plt.plot(range(1, actual_epochs + 1), train_losses, label='Training Loss', linewidth=2, color='#2E86AB')
+plt.plot(range(1, actual_epochs + 1), val_losses, label='Validation Loss', linewidth=2, color='#A23B72')
+plt.xlabel('Epoch', fontsize=12, fontweight='bold')
+plt.ylabel('Loss (MSE)', fontsize=12, fontweight='bold')
+plt.title('Model Loss During Training', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.subplot(1, 3, 2)
+plt.plot(range(1, actual_epochs + 1), train_maes, label='Training MAE', linewidth=2, color='#2E86AB')
+plt.plot(range(1, actual_epochs + 1), val_maes, label='Validation MAE', linewidth=2, color='#A23B72')
+plt.xlabel('Epoch', fontsize=12, fontweight='bold')
+plt.ylabel('MAE', fontsize=12, fontweight='bold')
+plt.title('Model MAE During Training', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.subplot(1, 3, 3)
+plt.plot(range(1, actual_epochs + 1), train_rmses, label='Training RMSE', linewidth=2, color='#2E86AB')
+plt.plot(range(1, actual_epochs + 1), val_rmses, label='Validation RMSE', linewidth=2, color='#A23B72')
+plt.xlabel('Epoch', fontsize=12, fontweight='bold')
+plt.ylabel('RMSE', fontsize=12, fontweight='bold')
+plt.title('Model RMSE During Training', fontsize=14, fontweight='bold')
+plt.legend(fontsize=10)
+plt.grid(True, alpha=0.3, linestyle='--')
+
+plt.tight_layout()
+plt.savefig('output/model_training_curves.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/model_training_curves.png")
+plt.show()
+
+# 11. 在测试集上进行预测
+print("\n(10) 在测试集上进行预测...")
+model.eval()
+with torch.no_grad():
+    y_pred_scaled = model(X_test_tensor).numpy().flatten()
+    y_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).flatten()
+
+# 确保预测值为非负
+y_pred = np.maximum(y_pred, 0)
+
+# 12. 计算评估指标（分别使用MAE和RMSE）
+print("\n(11) 计算评估指标...")
+# 使用MAE评估
+mae = mean_absolute_error(y_test, y_pred)
+# 使用RMSE评估
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+print(f"\n{'=' * 60}")
+print("测试集评估报告")
+print(f"{'=' * 60}")
+print(f"  MAE (平均绝对误差): {mae:.2f} 订单/小时")
+print(f"  RMSE (均方根误差): {rmse:.2f} 订单/小时")
+print(f"  测试集实际订单量范围: [{y_test.min():.0f}, {y_test.max():.0f}]")
+print(f"  测试集预测订单量范围: [{y_pred.min():.2f}, {y_pred.max():.2f}]")
+
+# 计算MAE和RMSE的相对误差
+mae_percentage = (mae / y_test.mean()) * 100
+rmse_percentage = (rmse / y_test.mean()) * 100
+print(f"\n  相对MAE: {mae_percentage:.2f}%")
+print(f"  相对RMSE: {rmse_percentage:.2f}%")
+
+# 13. 绘制预测vs实际值对比图
+print("\n(12) 绘制预测vs实际值对比图...")
+plt.figure(figsize=(14, 6))
+x_axis = range(len(y_test))
+plt.plot(x_axis, y_test, marker='o', markersize=4, linewidth=2, label='实际值', color='#2E86AB')
+plt.plot(x_axis, y_pred, marker='s', markersize=4, linewidth=2, label='预测值', color='#A23B72')
+plt.xlabel('测试集样本序号', fontsize=12, fontweight='bold')
+plt.ylabel('订单量 (Orders)', fontsize=12, fontweight='bold')
+plt.title(f'测试集预测结果对比 (上客点ID: {top_pickup_id})', fontsize=14, fontweight='bold')
+plt.legend(fontsize=12)
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.tight_layout()
+plt.savefig('output/prediction_vs_actual.png', dpi=300, bbox_inches='tight')
+print("    已保存: output/prediction_vs_actual.png")
+plt.show()
+
+# 14. 预测1月30日17时的订单量
+print("\n(13) 预测1月30日17时的订单量...")
+# 1月30日是星期几
+jan_30_date = pd.Timestamp('2023-01-30')
+jan_30_day_of_week = jan_30_date.dayofweek + 1  # 转换为1-7
+jan_30_day_of_month = 30
+jan_30_hour = 17
+
+print(f"    预测时间: 2023年1月30日 (星期{jan_30_day_of_week}) 17时")
+
+# 准备预测数据
+predict_input = np.array([[jan_30_day_of_month, jan_30_day_of_week, jan_30_hour]])
+predict_input_scaled = scaler_X.transform(predict_input)
+predict_input_tensor = torch.FloatTensor(predict_input_scaled)
+
+model.eval()
+with torch.no_grad():
+    predicted_demand_scaled = model(predict_input_tensor).numpy().flatten()[0]
+    predicted_demand = scaler_y.inverse_transform([[predicted_demand_scaled]])[0][0]
+    predicted_demand = max(0, predicted_demand)  # 确保非负
+
+print(f"\n{'=' * 60}")
+print("预测结果")
+print(f"{'=' * 60}")
+print(f"  上客点ID: {top_pickup_id}")
+print(f"  预测时间: 2023年1月30日 17:00")
+print(f"  预测订单量: {predicted_demand:.2f} 单")
+print(f"{'=' * 60}")
+
+# 15. 保存模型
+print("\n(14) 保存模型...")
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'scaler_X': scaler_X,
+    'scaler_y': scaler_y,
+    'model_config': {
+        'input_size': 3,
+        'hidden1': 64,
+        'hidden2': 32
+    }
+}, 'output/demand_prediction_model.pth')
+print("    模型已保存: output/demand_prediction_model.pth")
+
+print("\n" + "=" * 60)
+print("出行需求预测模型完成")
+print("=" * 60)
+print("生成的文件:")
+print("  1. output/model_training_curves.png - 模型训练曲线")
+print("  2. output/prediction_vs_actual.png - 预测vs实际值对比")
+print("  3. output/demand_prediction_model.pth - 训练好的模型 (PyTorch)")
