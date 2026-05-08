@@ -549,3 +549,90 @@ def TOP10_PULocationID(trips_data):
     print("=" * 60)
 
     return result_dict
+
+
+def TOP10_DOLocationID(trips_data):
+    """
+    研究10个订单量最多的下客点的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'DOLocationID'和'is_peak'列
+
+    返回:
+    dict: 包含TOP10下客点统计信息的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("区域热度分析：TOP 10 下客点")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'DOLocationID' not in trips_data.columns:
+        raise ValueError("数据中缺少'DOLocationID'列")
+    if 'is_peak' not in trips_data.columns:
+        raise ValueError("数据中缺少'is_peak'列，请先进行特征工程")
+
+    # 获取前10个订单量最多的下客点
+    top10_dropoff = trips_data['DOLocationID'].value_counts().head(10).index.tolist()
+
+    # 筛选出这10个下客点的数据
+    dropoff_data = trips_data[trips_data['DOLocationID'].isin(top10_dropoff)]
+
+    # 按下客点和是否高峰期统计订单量
+    dropoff_peak_stats = dropoff_data.groupby(['DOLocationID', 'is_peak']).size().unstack(fill_value=0)
+    dropoff_peak_stats.columns = ['off_peak', 'peak']  # 0=非高峰，1=高峰
+
+    # 按总订单量排序
+    dropoff_peak_stats['total'] = dropoff_peak_stats['peak'] + dropoff_peak_stats['off_peak']
+    dropoff_peak_stats = dropoff_peak_stats.sort_values(by='total', ascending=False)
+
+    # 输出TOP10下客点统计信息
+    print("\nTOP 10 热度最高下客点统计:")
+    print("-" * 70)
+    print(f"{'排名':<6} {'下客点ID':<12} {'总订单量':<12} {'高峰期订单量':<14} {'非高峰期订单量':<14}")
+    print("-" * 70)
+
+    result_dict = {}
+    for rank, (location_id, row) in enumerate(dropoff_peak_stats.iterrows(), 1):
+        total = int(row['total'])
+        peak = int(row['peak'])
+        off_peak = int(row['off_peak'])
+
+        print(f"{rank:<6} {int(location_id):<12} {total:<12} {peak:<14} {off_peak:<14}")
+
+        result_dict[int(location_id)] = {
+            'rank': rank,
+            'total_orders': total,
+            'peak_orders': peak,
+            'off_peak_orders': off_peak
+        }
+
+    # 图片路径
+    image_path = 'output/dropoff_location_heatmap.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("TOP 10 下客点分析完成")
+    print("=" * 60)
+
+    return result_dict
