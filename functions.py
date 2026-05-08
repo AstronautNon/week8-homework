@@ -142,4 +142,162 @@ def generate_data_quality_report(trips):
     }
 
 
+def clean_data(trips, original_trips=None):
+    """
+    数据清洗函数
 
+    参数:
+    trips: DataFrame，包含出租车行程数据
+    original_trips: DataFrame，原始数据（用于计算删除记录数），可选
+
+    返回:
+    tuple: (清洗后的DataFrame, 清洗统计信息字典)
+    """
+    print("\n\n" + "=" * 60)
+    print("数据清洗开始")
+    print("=" * 60)
+    print(f"原始数据记录数: {len(trips)}")
+
+    if original_trips is None:
+        original_count = len(trips)
+    else:
+        original_count = len(original_trips)
+
+    # 1. 删除所有包含NaN的行
+    print("\n(1) 删除包含NaN的行...")
+    print("    理由：含NaN行的数据存在缺失，无法补回数据")
+    before_count = len(trips)
+    trips = trips.dropna()
+    print(f"    删除了 {before_count - len(trips)} 条记录")
+    print(f"    剩余记录数: {len(trips)}")
+
+    # 2. 删除passenger_count异常的记录 (<=0 或 >6)
+    print("\n(2) 删除passenger_count异常的记录 (<=0 或 >6)...")
+    print("    理由：乘客数量超出物理限制，记录错误，无法找回真实值")
+    before_count = len(trips)
+    mask_passenger = (trips['passenger_count'] <= 0) | (trips['passenger_count'] > 6)
+    trips = trips[~mask_passenger].copy()
+    print(f"    删除了 {before_count - len(trips)} 条记录")
+    print(f"    剩余记录数: {len(trips)}")
+
+    # 3. 删除tpep_pickup_datetime >= tpep_dropoff_datetime的记录
+    print("\n(3) 删除上车时间 >= 下车时间的记录...")
+    print("    理由：上车时间晚于下车时间，登记错误故删除数据")
+    before_count = len(trips)
+    mask_time = trips['tpep_pickup_datetime'] >= trips['tpep_dropoff_datetime']
+    trips = trips[~mask_time].copy()
+    print(f"    删除了 {before_count - len(trips)} 条记录")
+    print(f"    剩余记录数: {len(trips)}")
+
+    # 4. 处理trip_distance
+    print("\n(4) 处理trip_distance...")
+    print("    理由：行程距离<0或>350均为异常记录，>100可能是长途行程，故添加标签方便后续研究")
+
+    before_count = len(trips)
+    mask_distance_zero = trips['trip_distance'] <= 0
+    trips = trips[~mask_distance_zero].copy()
+    print(f"    删除trip_distance <= 0的记录: {before_count - len(trips)} 条")
+
+    before_count = len(trips)
+    mask_distance_extreme = trips['trip_distance'] > 350
+    trips = trips[~mask_distance_extreme].copy()
+    print(f"    删除trip_distance > 350的记录: {before_count - len(trips)} 条")
+
+    trips['long_trip'] = trips['trip_distance'].apply(lambda x: 1 if (x > 100 and x <= 350) else 0)
+    long_trip_count = trips['long_trip'].sum()
+    print(f"    添加long_trip标签: {long_trip_count} 条记录标记为长途行程")
+    print(f"    剩余记录数: {len(trips)}")
+
+    # 5. 处理total_amount：删除<=0和>=1000的记录
+    print("\n(5) 处理total_amount...")
+    print("    理由：>=1000的路费过高，甚至超过长途旅行范围，故删除")
+    before_count = len(trips)
+    mask_total_invalid = (trips['total_amount'] <= 0) | (trips['total_amount'] >= 1000)
+    trips = trips[~mask_total_invalid].copy()
+    print(f"    删除了 {before_count - len(trips)} 条记录 (total_amount <= 0 或 >= 1000)")
+    print(f"    剩余记录数: {len(trips)}")
+
+    print("\n" + "=" * 60)
+    print("数据清洗完成")
+    print("=" * 60)
+    total_deleted = original_count - len(trips)
+    print(f"清洗后记录数: {len(trips)}")
+    print(f"总共删除记录数: {total_deleted}")
+    print(f"删除比例: {(total_deleted / original_count * 100):.2f}%")
+
+    cleaning_stats = {
+        'original_count': original_count,
+        'cleaned_count': len(trips),
+        'total_deleted': total_deleted,
+        'deletion_ratio': (total_deleted / original_count * 100),
+        'long_trip_count': long_trip_count
+    }
+
+    return trips, cleaning_stats
+
+
+def feature_engineering(trips):
+    """
+    特征工程函数
+
+    参数:
+    trips: DataFrame，清洗后的数据
+
+    返回:
+    tuple: (添加特征后的DataFrame, 特征工程统计信息字典)
+    """
+    print("\n\n" + "=" * 60)
+    print("特征工程开始")
+    print("=" * 60)
+
+    # 1. 从tpep_pickup_datetime提取小时和星期
+    print("\n(1) 提取上车时间的小时和星期...")
+    trips['pickup_hour'] = trips['tpep_pickup_datetime'].dt.hour
+    trips['pickup_day'] = trips['tpep_pickup_datetime'].dt.dayofweek + 1
+    print(f"    pickup_hour范围: {trips['pickup_hour'].min()} - {trips['pickup_hour'].max()}")
+    print(f"    pickup_day范围: {trips['pickup_day'].min()} (周一) - {trips['pickup_day'].max()} (周日)")
+
+    # 2. 从tpep_dropoff_datetime提取小时
+    print("\n(2) 提取下车时间的小时...")
+    trips['dropoff_hour'] = trips['tpep_dropoff_datetime'].dt.hour
+    print(f"    dropoff_hour范围: {trips['dropoff_hour'].min()} - {trips['dropoff_hour'].max()}")
+
+    # 3. 创建is_peak列
+    print("\n(3) 创建is_peak列（高峰期标记）...")
+    trips['is_peak'] = (
+            (trips['pickup_day'] <= 5) &
+            ((trips['pickup_hour'] >= 7) & (trips['pickup_hour'] <= 9) |
+             (trips['pickup_hour'] >= 17) & (trips['pickup_hour'] <= 19))
+    ).astype(int)
+
+    peak_count = trips['is_peak'].sum()
+    print(f"    高峰期行程数量: {peak_count}")
+    print(f"    非高峰期行程数量: {len(trips) - peak_count}")
+    print(f"    高峰期占比: {(peak_count / len(trips) * 100):.2f}%")
+
+    # 4. 创建pre_distance_profit列
+    print("\n(4) 创建pre_distance_profit列（单位距离收益）...")
+    trips['pre_distance_profit'] = trips['total_amount'] / trips['trip_distance']
+    print(f"    pre_distance_profit统计信息:")
+    print(f"    平均值: {trips['pre_distance_profit'].mean():.2f}")
+    print(f"    最小值: {trips['pre_distance_profit'].min():.2f}")
+    print(f"    最大值: {trips['pre_distance_profit'].max():.2f}")
+    print(f"    中位数: {trips['pre_distance_profit'].median():.2f}")
+
+    print("\n" + "=" * 60)
+    print("特征工程完成")
+    print("=" * 60)
+    new_features = ['pickup_hour', 'pickup_day', 'dropoff_hour', 'is_peak', 'pre_distance_profit']
+    print(f"新增列: {new_features}")
+    print(f"当前总列数: {len(trips.columns)}")
+    print(f"当前记录数: {len(trips)}")
+
+    feature_stats = {
+        'new_features': new_features,
+        'total_columns': len(trips.columns),
+        'total_records': len(trips),
+        'peak_count': int(peak_count),
+        'peak_ratio': float(peak_count / len(trips) * 100)
+    }
+
+    return trips, feature_stats
