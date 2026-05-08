@@ -11,6 +11,9 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
+import os
+import subprocess
+import platform
 
 '''
 函数存放区
@@ -301,3 +304,77 @@ def feature_engineering(trips):
     }
 
     return trips, feature_stats
+
+
+def analyze_time_distribution(trips_data):
+    """
+    研究出行需求时间分布的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'tpep_pickup_datetime'列
+
+    返回:
+    hourly_avg_orders: 每小时平均订单量的Series
+    """
+    print("\n\n" + "=" * 60)
+    print("出行需求时间分布分析")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'tpep_pickup_datetime' not in trips_data.columns:
+        raise ValueError("数据中缺少'tpep_pickup_datetime'列")
+
+    # 提取小时信息
+    trips_data = trips_data.copy()
+    trips_data['pickup_hour'] = trips_data['tpep_pickup_datetime'].dt.hour
+
+    # 计算每小时的订单量
+    hourly_orders = trips_data.groupby('pickup_hour').size()
+
+    # 计算平均订单量（按天数平均）
+    unique_days = trips_data['tpep_pickup_datetime'].dt.date.nunique()
+    if unique_days > 0:
+        hourly_avg_orders = hourly_orders / unique_days
+    else:
+        hourly_avg_orders = hourly_orders
+
+    # 输出小时平均订单量统计
+    print("\n小时平均订单量统计:")
+    print("-" * 30)
+    for hour in range(24):
+        if hour in hourly_avg_orders.index:
+            avg_count = hourly_avg_orders[hour]
+            print(f"  {hour:02d}:00 - 平均订单量: {avg_count:.1f}")
+        else:
+            print(f"  {hour:02d}:00 - 平均订单量: 0.0")
+
+    # 图片路径
+    image_path = 'output/hourly_order_distribution.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("出行需求时间分布分析完成")
+    print("=" * 60)
+
+    return hourly_avg_orders
