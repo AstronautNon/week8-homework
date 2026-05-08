@@ -306,7 +306,7 @@ def feature_engineering(trips):
     return trips, feature_stats
 
 
-def analyze_time_distribution(trips_data):
+def analyze_hour_distribution(trips_data):
     """
     研究出行需求时间分布的函数
 
@@ -378,3 +378,87 @@ def analyze_time_distribution(trips_data):
     print("=" * 60)
 
     return hourly_avg_orders
+
+
+def analyze_workday_weekend_distribution(trips_data):
+    """
+    研究工作日和周末出行需求分布的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'pickup_day'列（1-7表示周一到周日）
+
+    返回:
+    dict: 包含工作日和周末平均订单量的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("工作日与周末出行需求分布分析")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'pickup_day' not in trips_data.columns:
+        raise ValueError("数据中缺少'pickup_day'列，请先进行特征工程")
+
+    # 创建is_weekend列
+    trips_data = trips_data.copy()
+    trips_data['is_weekend'] = trips_data['pickup_day'].apply(lambda x: 1 if x >= 6 else 0)
+
+    # 计算每天类型的订单量
+    daily_orders = trips_data.groupby(['pickup_day', 'is_weekend']).size().reset_index(name='order_count')
+
+    # 计算工作日和周末的平均订单量（按天数平均）
+    workday_days = 5  # 周一到周五
+    weekend_days = 2  # 周六和周日
+
+    workday_total = daily_orders[daily_orders['is_weekend'] == 0]['order_count'].sum()
+    weekend_total = daily_orders[daily_orders['is_weekend'] == 1]['order_count'].sum()
+
+    workday_avg = workday_total / workday_days
+    weekend_avg = weekend_total / weekend_days
+
+    # 输出统计信息
+    print("\n工作日与周末平均订单量统计:")
+    print("-" * 40)
+    print(f"  工作日平均订单量: {workday_avg:.1f} 单/天")
+    print(f"  周末平均订单量: {weekend_avg:.1f} 单/天")
+    print(f"  差异: {abs(workday_avg - weekend_avg):.1f} 单/天")
+
+    if workday_avg > weekend_avg:
+        print(f"  结论: 工作日订单量比周末高 {(workday_avg - weekend_avg) / weekend_avg * 100:.1f}%")
+    else:
+        print(f"  结论: 周末订单量比工作日高 {(weekend_avg - workday_avg) / workday_avg * 100:.1f}%")
+
+    # 图片路径
+    image_path = 'output/workday_weekend_comparison.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("工作日与周末出行需求分布分析完成")
+    print("=" * 60)
+
+    return {
+        'workday_avg': workday_avg,
+        'weekend_avg': weekend_avg,
+        'workday_total': workday_total,
+        'weekend_total': weekend_total
+    }
