@@ -6,7 +6,8 @@ from functions import (generate_data_quality_report,
                        analyze_workday_weekend_distribution,
                        TOP10_PULocationID,
                        TOP10_DOLocationID,
-                       hour_vs_fare)
+                       hour_vs_fare,
+                       hour_vs_tips)
 
 
 #主函数区
@@ -27,4 +28,5 @@ trips_featured, feature_stats = feature_engineering(trips_cleaned)
 #workday_weekend_stats = analyze_workday_weekend_distribution(trips_featured)
 #top10_pickup_stats = TOP10_PULocationID(trips_featured)
 #top10_dropoff_stats = TOP10_DOLocationID(trips_featured)
-hour_fare_stats = hour_vs_fare(trips_featured)
+#hour_fare_stats = hour_vs_fare(trips_featured)
+hour_tip_stats = hour_vs_tips(trips_featured)
