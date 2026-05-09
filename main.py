@@ -930,17 +930,16 @@ print(f"{'=' * 60}")
 
 # 15. 保存模型
 print("\n(14) 保存模型...")
-torch.save({
-    'model_state_dict': model.state_dict(),
-    'scaler_X': scaler_X,
-    'scaler_y': scaler_y,
-    'model_config': {
-        'input_size': 3,
-        'hidden1': 64,
-        'hidden2': 32
-    }
-}, 'output/demand_prediction_model.pth')
-print("    模型已保存: output/demand_prediction_model.pth")
+torch.save(model.state_dict(), 'output/demand_prediction_model_state_dict.pth')
+print("    模型已保存: output/demand_prediction_model_state_dict.pth")
+
+# 16. 保存 scaler
+print("\n(15) 保存特征标准化器...")
+import joblib
+joblib.dump(scaler_X, 'output/scaler_X.pkl')
+joblib.dump(scaler_y, 'output/scaler_y.pkl')
+print("    scaler_X 已保存: output/scaler_X.pkl")
+print("    scaler_y 已保存: output/scaler_y.pkl")
 
 print("\n" + "=" * 60)
 print("出行需求预测模型完成")
@@ -948,7 +947,9 @@ print("=" * 60)
 print("生成的文件:")
 print("  1. output/model_training_curves.png - 模型训练曲线")
 print("  2. output/prediction_vs_actual.png - 预测vs实际值对比")
-print("  3. output/demand_prediction_model.pth - 训练好的模型 (PyTorch)")
+print("  3. output/demand_prediction_model_state_dict.pth - 训练好的模型 (PyTorch)")
+print("  4. output/scaler_X.pkl - 特征标准化器")
+print("  5. output/scaler_y.pkl - 标签标准化器")
 
 
 

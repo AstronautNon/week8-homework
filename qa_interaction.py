@@ -11,7 +11,8 @@ from functions import (generate_data_quality_report,
                        passenger_vs_fare,
                        long_trip_profit_detail,
                        long_vs_normal_profit,
-                       model_training)
+                       model_training,
+                       predict_demand_interactive)
 
 
 #主函数区
@@ -37,4 +38,5 @@ trips_featured, feature_stats = feature_engineering(trips_cleaned)
 #passenger_fare_stats = passenger_vs_fare(trips_featured)
 #long_trip_details = long_trip_profit_detail(trips_featured)
 #profit_comparison = long_vs_normal_profit(trips_featured)
-nn_training_results = model_training()
+#nn_training_results = model_training()
+prediction_result = predict_demand_interactive()

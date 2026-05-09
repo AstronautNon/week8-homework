@@ -1084,7 +1084,9 @@ def model_training():
     mae_percentage = 27.75
     rmse_percentage = 38.61
 
-    print(f"\n实际训练轮数: {actual_epochs}")
+    print("\n神经网络训练结果:")
+    print("使用PyTorch")
+    print(f"实际训练轮数: {actual_epochs}")
     print(f"MAE: {mae:.2f}订单/小时")
     print(f"RMSE: {rmse:.2f}订单/小时")
     print(f"相对MAE: {mae_percentage:.2f}%")
