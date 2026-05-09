@@ -13,7 +13,8 @@ from functions import (generate_data_quality_report,
                        long_trip_profit_detail,
                        long_vs_normal_profit,
                        model_training,
-                       predict_demand_interactive)
+                       predict_demand_interactive,
+                       predict_demand_interactive_rf)
 
 
 #主函数区
@@ -40,4 +41,5 @@ trips_featured, feature_stats = feature_engineering(trips_cleaned)
 #long_trip_details = long_trip_profit_detail(trips_featured)
 #profit_comparison = long_vs_normal_profit(trips_featured)
 #nn_training_results = model_training()
-prediction_result = predict_demand_interactive()
+#prediction_result = predict_demand_interactive()
+rf_prediction_result = predict_demand_interactive_rf()

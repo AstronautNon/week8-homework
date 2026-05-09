@@ -1344,3 +1344,185 @@ def predict_demand_interactive():
         },
         'model_loaded': True
     }
+
+
+
+def predict_demand_interactive_rf():
+    """
+    调用已训练好的随机森林模型进行交互式需求预测的函数
+
+    参数:
+    无
+
+    返回:
+    dict: 包含预测结果和对比信息的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("机器学习：随机森林需求预测（交互模式）")
+    print("=" * 60)
+
+    # 首先展示示例预测
+    print("\n【示例预测】")
+    print("-" * 60)
+    print("我们将先预测 2023年1月30日 17时 的订单量作为示例")
+    print()
+
+    # 示例：1月30日17时
+    demo_date = pd.Timestamp('2023-01-30')
+    demo_day_of_month = 30
+    demo_day_of_week = demo_date.dayofweek + 1  # 转换为1-7
+    demo_hour = 17
+
+    print(f"示例输入格式:")
+    print(f"  日期: 2023-01-30")
+    print(f"  时间: 17")
+    print()
+
+    # 加载随机森林模型
+    try:
+        import joblib
+
+        # 加载随机森林模型
+        rf_model = joblib.load('output/random_forest_model.pkl')
+
+        print("随机森林模型加载成功！")
+        print()
+
+    except FileNotFoundError as e:
+        print(f"错误: 未找到文件 - {e}")
+        print("请先运行 main.py 训练并保存随机森林模型")
+        return None
+    except Exception as e:
+        print(f"错误: 加载模型失败 - {e}")
+        return None
+
+    # 执行示例预测
+    print("【示例预测结果】")
+    print("-" * 60)
+    demo_input = np.array([[demo_day_of_month, demo_day_of_week, demo_hour]])
+
+    # 随机森林不需要标准化，直接预测
+    demo_predicted = rf_model.predict(demo_input)[0]
+    demo_predicted = max(0, demo_predicted)
+
+    print(f"预测时间: 2023年1月30日 (星期{demo_day_of_week}) 17时")
+    print(f"预测订单量: {demo_predicted:.2f} 单")
+    print()
+
+    # 尝试获取真实值进行比较（如果数据可用）
+    try:
+        trips = pq.read_table('data/yellow_tripdata_2023-01.parquet').to_pandas()
+        trips = trips[trips['PULocationID'] == trips['PULocationID'].value_counts().index[0]]
+        trips['date'] = trips['tpep_pickup_datetime'].dt.date
+        trips['day_of_month'] = trips['tpep_pickup_datetime'].dt.day
+        trips['hour'] = trips['tpep_pickup_datetime'].dt.hour
+
+        target_date = pd.Timestamp('2023-01-30').date()
+        actual_data = trips[(trips['date'] == target_date) & (trips['hour'] == demo_hour)]
+
+        if len(actual_data) > 0:
+            actual_count = len(actual_data)
+            abs_diff = abs(demo_predicted - actual_count)
+            rel_diff = (abs_diff / actual_count * 100) if actual_count > 0 else 0
+
+            print(f"实际订单量: {actual_count} 单")
+            print(f"绝对数量差: {abs_diff:.2f} 单")
+            print(f"相对数量差: {rel_diff:.2f}%")
+        else:
+            print(f"实际订单量: 无数据")
+    except Exception as e:
+        print(f"无法获取实际数据: {e}")
+
+    print()
+    print("=" * 60)
+    print("现在请输入您要预测的时间")
+    print("=" * 60)
+    print("提示: 日期格式为 YYYY-MM-DD，时间为小时（0-23）")
+    print()
+
+    # 用户交互循环
+    while True:
+        try:
+            # 获取用户输入
+            date_str = input("请输入日期 (例如: 2023-01-30，输入 q 退出): ").strip()
+
+            if date_str.lower() == 'q':
+                print("\n预测程序已退出")
+                break
+
+            hour_str = input("请输入小时 (0-23，例如: 17): ").strip()
+
+            # 解析输入
+            pred_date = pd.Timestamp(date_str)
+            pred_hour = int(hour_str)
+
+            # 验证小时范围
+            if pred_hour < 0 or pred_hour > 23:
+                print("错误: 小时必须在 0-23 之间，请重新输入\n")
+                continue
+
+            # 提取特征
+            pred_day_of_month = pred_date.day
+            pred_day_of_week = pred_date.dayofweek + 1  # 转换为1-7
+
+            print()
+            print("-" * 60)
+            print(f"预测时间: {date_str} (星期{pred_day_of_week}) {pred_hour:02d}:00")
+
+            # 准备预测数据（随机森林不需要标准化）
+            pred_input = np.array([[pred_day_of_month, pred_day_of_week, pred_hour]])
+
+            # 进行预测
+            predicted = rf_model.predict(pred_input)[0]
+            predicted = max(0, predicted)
+
+            print(f"预测订单量: {predicted:.2f} 单")
+
+            # 尝试获取真实值进行比较
+            try:
+                trips = pq.read_table('data/yellow_tripdata_2023-01.parquet').to_pandas()
+                trips = trips[trips['PULocationID'] == trips['PULocationID'].value_counts().index[0]]
+                trips['date'] = trips['tpep_pickup_datetime'].dt.date
+                trips['day_of_month'] = trips['tpep_pickup_datetime'].dt.day
+                trips['hour'] = trips['tpep_pickup_datetime'].dt.hour
+
+                target_date = pred_date.date()
+                actual_data = trips[(trips['date'] == target_date) & (trips['hour'] == pred_hour)]
+
+                if len(actual_data) > 0:
+                    actual_count = len(actual_data)
+                    abs_diff = abs(predicted - actual_count)
+                    rel_diff = (abs_diff / actual_count * 100) if actual_count > 0 else 0
+
+                    print(f"实际订单量: {actual_count} 单")
+                    print(f"绝对数量差: {abs_diff:.2f} 单")
+                    print(f"相对数量差: {rel_diff:.2f}%")
+
+                    if predicted > actual_count:
+                        print(f"结论: 预测值比实际值高 {abs_diff:.2f} 单 ({rel_diff:.2f}%)")
+                    else:
+                        print(f"结论: 预测值比实际值低 {abs_diff:.2f} 单 ({rel_diff:.2f}%)")
+                else:
+                    print(f"实际订单量: 无数据（该时间段可能没有记录）")
+            except Exception as e:
+                print(f"无法获取实际数据进行对比: {e}")
+
+            print("-" * 60)
+            print()
+
+        except ValueError as ve:
+            print(f"\n输入格式错误: {ve}")
+            print("请确保日期格式为 YYYY-MM-DD，时间为整数\n")
+        except Exception as e:
+            print(f"\n发生错误: {e}")
+            print("请重新输入\n")
+
+    return {
+        'demo_prediction': {
+            'date': '2023-01-30',
+            'hour': 17,
+            'predicted': float(demo_predicted)
+        },
+        'model_loaded': True,
+        'model_type': 'Random Forest'
+    }
