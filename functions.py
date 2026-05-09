@@ -889,3 +889,99 @@ def passenger_vs_fare(trips_data):
     print("=" * 60)
 
     return result_dict
+
+
+
+def long_trip_profit_detail(trips_data):
+    """
+    研究每一趟长途旅行的单位距离收益的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'long_trip'、'pre_distance_profit'和'trip_distance'列
+
+    返回:
+    dict: 包含长途旅行统计信息和每趟旅行详细数据的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("长途旅行单位距离收益分析：每趟长途旅行详情")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'long_trip' not in trips_data.columns:
+        raise ValueError("数据中缺少'long_trip'列，请先进行数据清洗")
+    if 'pre_distance_profit' not in trips_data.columns:
+        raise ValueError("数据中缺少'pre_distance_profit'列，请先进行特征工程")
+    if 'trip_distance' not in trips_data.columns:
+        raise ValueError("数据中缺少'trip_distance'列")
+
+    # 筛选出长途旅行数据
+    long_trip_data = trips_data[trips_data['long_trip'] == 1].copy()
+
+    if len(long_trip_data) == 0:
+        print("\n警告: 未找到长途旅行数据")
+        return {
+            'total_long_trips': 0,
+            'avg_profit': None,
+            'details': {}
+        }
+
+    # 输出长途旅行基本信息
+    print(f"\n长途旅行总数: {len(long_trip_data)}")
+    print(f"平均单位距离收益: ${long_trip_data['pre_distance_profit'].mean():.2f}/mile")
+    print(f"最小单位距离收益: ${long_trip_data['pre_distance_profit'].min():.2f}/mile")
+    print(f"最大单位距离收益: ${long_trip_data['pre_distance_profit'].max():.2f}/mile")
+    print(f"中位数单位距离收益: ${long_trip_data['pre_distance_profit'].median():.2f}/mile")
+
+    # 输出前10趟长途旅行的详细信息
+    print("\n前10趟长途旅行详情:")
+    print("-" * 65)
+    print(f"{'序号':<8} {'行程距离(mile)':<18} {'单位距离收益($/mile)':<25}")
+    print("-" * 65)
+
+    details_dict = {}
+    for i in range(min(10, len(long_trip_data))):
+        distance = long_trip_data['trip_distance'].iloc[i]
+        profit = long_trip_data['pre_distance_profit'].iloc[i]
+        print(f"{i+1:<8} {distance:<18.2f} {profit:<25.2f}")
+        details_dict[i+1] = {
+            'distance': float(distance),
+            'profit': float(profit)
+        }
+
+    # 图片路径
+    image_path = 'output/long_trip_profit_detail.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("长途旅行单位距离收益分析完成")
+    print("=" * 60)
+
+    return {
+        'total_long_trips': len(long_trip_data),
+        'avg_profit': float(long_trip_data['pre_distance_profit'].mean()),
+        'min_profit': float(long_trip_data['pre_distance_profit'].min()),
+        'max_profit': float(long_trip_data['pre_distance_profit'].max()),
+        'median_profit': float(long_trip_data['pre_distance_profit'].median()),
+        'sample_details': details_dict
+    }
