@@ -985,3 +985,78 @@ def long_trip_profit_detail(trips_data):
         'median_profit': float(long_trip_data['pre_distance_profit'].median()),
         'sample_details': details_dict
     }
+
+
+
+def long_vs_normal_profit(trips_data):
+    """
+    研究长途与非长途旅行平均单位距离收益对比的函数
+
+    参数:
+    trips_data: DataFrame，包含行程数据，需要有'long_trip'和'pre_distance_profit'列
+
+    返回:
+    dict: 包含长途和非长途旅行统计信息的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("长途旅行单位距离收益分析：长途vs非长途对比")
+    print("=" * 60)
+
+    # 确保数据中包含必要的列
+    if 'long_trip' not in trips_data.columns:
+        raise ValueError("数据中缺少'long_trip'列，请先进行数据清洗")
+    if 'pre_distance_profit' not in trips_data.columns:
+        raise ValueError("数据中缺少'pre_distance_profit'列，请先进行特征工程")
+
+    # 计算长途旅行的平均单位距离收益
+    long_trip_avg_profit = trips_data[trips_data['long_trip'] == 1]['pre_distance_profit'].mean()
+    # 计算非长途旅行的平均单位距离收益
+    normal_trip_avg_profit = trips_data[trips_data['long_trip'] == 0]['pre_distance_profit'].mean()
+
+    # 输出统计信息
+    print(f"\n长途旅行平均单位距离收益: ${long_trip_avg_profit:.2f}/mile")
+    print(f"非长途旅行平均单位距离收益: ${normal_trip_avg_profit:.2f}/mile")
+    print(f"差异: ${abs(long_trip_avg_profit - normal_trip_avg_profit):.2f}/mile")
+
+    if long_trip_avg_profit > normal_trip_avg_profit:
+        percentage = (long_trip_avg_profit - normal_trip_avg_profit) / normal_trip_avg_profit * 100
+        print(f"结论: 长途旅行单位距离收益比非长途高 {percentage:.1f}%")
+    else:
+        percentage = (normal_trip_avg_profit - long_trip_avg_profit) / long_trip_avg_profit * 100
+        print(f"结论: 非长途旅行单位距离收益比长途高 {percentage:.1f}%")
+
+    # 图片路径
+    image_path = 'output/long_vs_normal_profit_comparison.png'
+
+    # 检查图片是否存在
+    if os.path.exists(image_path):
+        print(f"\n图片相对路径: {image_path}")
+        print(f"图片绝对路径: {os.path.abspath(image_path)}")
+
+        # 打开图片
+        try:
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                subprocess.call(['open', image_path])
+            elif system_platform == "Windows":
+                subprocess.call(['start', image_path], shell=True)
+            else:  # Linux
+                subprocess.call(['xdg-open', image_path])
+            print(f"已尝试打开图片: {image_path}")
+        except Exception as e:
+            print(f"无法自动打开图片: {e}")
+            print(f"请手动打开: {image_path}")
+    else:
+        print(f"\n警告: 图片文件不存在: {image_path}")
+        print("请先运行 main.py 生成该图片")
+
+    print("\n" + "=" * 60)
+    print("长途与非长途旅行单位距离收益对比分析完成")
+    print("=" * 60)
+
+    return {
+        'long_trip_avg_profit': float(long_trip_avg_profit),
+        'normal_trip_avg_profit': float(normal_trip_avg_profit),
+        'difference': float(abs(long_trip_avg_profit - normal_trip_avg_profit)),
+        'long_trip_higher': long_trip_avg_profit > normal_trip_avg_profit
+    }

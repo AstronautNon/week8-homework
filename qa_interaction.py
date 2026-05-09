@@ -9,7 +9,8 @@ from functions import (generate_data_quality_report,
                        hour_vs_fare,
                        hour_vs_tips,
                        passenger_vs_fare,
-                       long_trip_profit_detail)
+                       long_trip_profit_detail,
+                       long_vs_normal_profit)
 
 
 #主函数区
@@ -33,4 +34,5 @@ trips_featured, feature_stats = feature_engineering(trips_cleaned)
 #hour_fare_stats = hour_vs_fare(trips_featured)
 #hour_tip_stats = hour_vs_tips(trips_featured)
 #passenger_fare_stats = passenger_vs_fare(trips_featured)
-long_trip_details = long_trip_profit_detail(trips_featured)
+#long_trip_details = long_trip_profit_detail(trips_featured)
+profit_comparison = long_vs_normal_profit(trips_featured)
