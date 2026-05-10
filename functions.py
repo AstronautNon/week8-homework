@@ -1455,3 +1455,112 @@ def predict_demand_interactive_rf():
 
 
 
+def show_model_visualization(keyword='all'):
+    """
+    展示模型训练后的可视化结果
+
+    参数:
+    keyword: str, 关键词，用于筛选要显示的图片
+             可选值：
+             - 'all': 显示所有图片
+             - 'loss': 神经网络训练曲线（Loss、MAE、RMSE）
+             - 'prediction': 预测vs实际值对比图
+             - 'comparison': 模型对比图（神经网络 vs 随机森林）
+             - 'mae_rmse': MAE和RMSE对比柱状图
+             - 'error': 误差分布对比图
+             - 'scatter': 预测vs实际散点图
+
+    返回:
+    dict: 包含所有图片路径的字典
+    """
+    print("\n\n" + "=" * 60)
+    print("模型可视化结果展示")
+    print("=" * 60)
+
+    # 定义所有可用的图片及其信息
+    all_images = {
+        'loss': {
+            'path': 'output/model_training_curves.png',
+            'description': '神经网络训练曲线（Loss、MAE、RMSE）'
+        },
+        'prediction': {
+            'path': 'output/prediction_vs_actual.png',
+            'description': '神经网络预测vs实际值对比图'
+        },
+        'mae_rmse': {
+            'path': 'output/model_comparison_mae_rmse.png',
+            'description': '神经网络与随机森林 MAE/RMSE 对比柱状图'
+        },
+        'comparison': {
+            'path': 'output/model_prediction_comparison.png',
+            'description': '神经网络与随机森林预测结果对比图'
+        },
+        'error': {
+            'path': 'output/model_error_distribution.png',
+            'description': '神经网络与随机森林误差分布对比图'
+        },
+        'scatter': {
+            'path': 'output/model_scatter_comparison.png',
+            'description': '神经网络与随机森林预测vs实际散点图'
+        }
+    }
+
+    # 根据关键词选择要显示的图片
+    if keyword == 'all':
+        selected_images = all_images
+        print(f"\n将显示所有 {len(selected_images)} 张可视化图片\n")
+    elif keyword in all_images:
+        selected_images = {keyword: all_images[keyword]}
+        print(f"\n将显示: {selected_images[keyword]['description']}\n")
+    else:
+        print(f"\n警告: 未识别的关键词 '{keyword}'")
+        print(f"可用关键词: {', '.join(all_images.keys())}")
+        print("将显示所有图片\n")
+        selected_images = all_images
+
+    # 遍历并打开选中的图片
+    opened_count = 0
+    for key, image_info in selected_images.items():
+        image_path = image_info['path']
+        description = image_info['description']
+
+        print("-" * 60)
+        print(f"图片类型: {key}")
+        print(f"描述: {description}")
+
+        if os.path.exists(image_path):
+            abs_path = os.path.abspath(image_path)
+            print(f"相对路径: {image_path}")
+            print(f"绝对路径: {abs_path}")
+
+            # 打开图片
+            try:
+                system_platform = platform.system()
+                if system_platform == "Darwin":  # macOS
+                    subprocess.call(['open', image_path])
+                elif system_platform == "Windows":
+                    subprocess.call(['start', image_path], shell=True)
+                else:  # Linux
+                    subprocess.call(['xdg-open', image_path])
+                print(f"✓ 已尝试打开图片")
+                opened_count += 1
+            except Exception as e:
+                print(f"✗ 无法自动打开图片: {e}")
+                print(f"  请手动打开: {image_path}")
+        else:
+            print(f"✗ 警告: 图片文件不存在: {image_path}")
+            print(f"  请先运行 main.py 生成该图片")
+        print()
+
+    print("=" * 60)
+    print(f"可视化结果展示完成")
+    print(f"成功打开 {opened_count}/{len(selected_images)} 张图片")
+    print("=" * 60)
+
+    # 返回所有图片路径信息
+    return {
+        'requested_keyword': keyword,
+        'total_images': len(selected_images),
+        'opened_images': opened_count,
+        'images': {key: info['path'] for key, info in selected_images.items()}
+    }
