@@ -1,5 +1,7 @@
 #库导入区
 import pyarrow.parquet as pq
+import requests
+import json
 from functions import (generate_data_quality_report,
                        clean_data,
                        feature_engineering,
@@ -15,6 +17,119 @@ from functions import (generate_data_quality_report,
                        predict_demand_interactive,
                        predict_demand_interactive_rf,
                        show_model_visualization)
+
+
+# ==================== DeepSeek API 配置 ====================
+DEEPSEEK_API_KEY = "sk-fe49f2809c8343eb876ebdef49926671"  # 请替换为您的 DeepSeek API Key
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
+
+def get_system_capabilities():
+    """
+    从命令注册表中提取系统能力描述
+
+    返回:
+    str: 系统功能描述的文本
+    """
+    capabilities = []
+
+    # 按类别分组
+    categories = {}
+    for cmd in COMMAND_REGISTRY:
+        category = cmd.get('category', '其他')
+        if category not in categories:
+            categories[category] = []
+        categories[category].append(cmd)
+
+    for category, commands in categories.items():
+        capabilities.append(f"\n【{category}】")
+        for cmd in commands:
+            keywords = cmd['keywords'][:2]
+            keyword_str = ' / '.join(keywords)
+            capabilities.append(f"- {cmd['desc']}（可输入：{keyword_str}）")
+
+    return '\n'.join(capabilities)
+
+
+def explain_unsupported_query(user_input):
+    """
+    调用 DeepSeek API 生成友好的错误解释
+
+    参数:
+    user_input: str, 用户的原始输入
+
+    返回:
+    str: DeepSeek 生成的解释文本，如果调用失败则返回默认提示
+    """
+    # 获取系统能力描述
+    system_capabilities = get_system_capabilities()
+
+    # 构建 prompt
+    prompt = f"""你是一个智慧交通助手的后端解释模块。
+当前系统只能完成以下功能：
+{system_capabilities}
+
+用户刚才的提问是："{user_input}"
+系统没能理解或无法执行。请你用中文友好地告诉用户：
+1. 为什么当前不能回答（比如功能限制、数据范围等）
+2. 可以建议用户怎样提问才能得到帮助（引导到已有功能上）
+3. 尽量简短，不超过三句话。"""
+
+    try:
+        # 构建请求
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+        }
+
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": "你是一个友好的智能助手，擅长用简洁清晰的语言解释问题。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 150
+        }
+
+        # 发送请求
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+
+        # 解析响应
+        result = response.json()
+        explanation = result['choices'][0]['message']['content'].strip()
+
+        return explanation
+
+    except requests.exceptions.RequestException as e:
+        # API 调用失败，返回默认提示
+        print(f"\n[DEBUG] DeepSeek API 调用失败: {e}")
+        return generate_fallback_explanation(user_input)
+    except Exception as e:
+        print(f"\n[DEBUG] 生成解释时出错: {e}")
+        return generate_fallback_explanation(user_input)
+
+
+def generate_fallback_explanation(user_input):
+    """
+    当 API 调用失败时，生成默认的友好提示
+
+    参数:
+    user_input: str, 用户的原始输入
+
+    返回:
+    str: 默认的解释文本
+    """
+    fallback_messages = [
+        f"抱歉，我暂时无法理解您的问题。您可以输入 'help' 查看我支持的功能列表，或者尝试使用更具体的关键词，如'小时分布'、'时段车费'等。",
+        f"这个问题超出了我的能力范围哦～我是出租车数据分析助手，主要提供数据统计和可视化功能。试试输入 'help' 看看我能做什么吧！",
+        f"我可能没听懂您的意思。作为智慧交通助手，我可以分析出租车出行数据、预测订单量等。输入 'help' 或 '帮助' 获取完整功能列表吧！"
+    ]
+
+    # 根据输入长度选择不同的提示
+    import random
+    return random.choice(fallback_messages)
 
 
 # ==================== 命令注册表（可扩展设计）====================
@@ -236,7 +351,7 @@ def auto_preprocessing(trips, original_trips):
     # 询问是否需要生成数据质量报告
     while True:
         choice = input("\n是否生成数据质量报告？(yes/no) > ").strip().lower()
-        if choice in ['yes', 'y', '是', '是的', '要']:
+        if choice in ['yes', 'y', '是', '是的']:
             print("\n正在生成数据质量报告...")
             generate_data_quality_report(trips)
             break
@@ -339,9 +454,12 @@ def main():
                     print(f"\n✗ 执行出错: {e}")
                     print("请检查是否已完成数据预处理，或联系管理员\n")
             else:
-                # 未识别的命令
+                # 未识别的命令 - 调用 DeepSeek 生成友好解释
                 print(f"\n⚠ 未识别的命令: '{user_input}'")
-                print("输入 'help' 或 '帮助' 查看可用命令\n")
+
+                # 调用 DeepSeek API 生成解释
+                explanation = explain_unsupported_query(user_input)
+                print(f"\n💡 {explanation}\n")
 
         except KeyboardInterrupt:
             print("\n\n检测到中断信号")
